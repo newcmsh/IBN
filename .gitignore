@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+dist-electron
+electron-app-url.json
+out
+build
+.env.local
+.env
+*.log
+
+# Electron
+release
+electron/dist
