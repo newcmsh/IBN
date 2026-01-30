@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS grant_announcements (
   title TEXT NOT NULL,
   max_amount BIGINT NOT NULL,
   url TEXT,
+  -- 원문/수집 출처 링크 (기관 상세 링크 등). UI에서 "원문 보기" 용도로 사용.
+  source_url TEXT,
 
   -- 업력 (월 단위, 설립일 기준)
   min_age_months INT,
@@ -101,6 +103,9 @@ CREATE TABLE IF NOT EXISTS grant_announcements (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- 기존 테이블에 컬럼이 없을 수 있으므로 idempotent migration
+ALTER TABLE grant_announcements ADD COLUMN IF NOT EXISTS source_url TEXT;
 
 -- =============================================================================
 -- 4. RLS 정책 대상 테이블 (user_id 소유 행)

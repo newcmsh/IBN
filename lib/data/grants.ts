@@ -109,7 +109,7 @@ export async function getGrantAnnouncements(): Promise<GrantAnnouncement[]> {
       const { data, error } = await supabaseAdmin
         .from("grant_announcements")
         .select(
-          "source_name,source_ann_id,agency,title,max_amount,url,published_at,deadline_at,interest_rate,grace_period_months,target_criteria"
+          "source_name,source_ann_id,agency,title,max_amount,url,source_url,published_at,deadline_at,interest_rate,grace_period_months,target_criteria"
         )
         // 기본 정렬: 최신 게시일 우선 (없으면 created_at 기준이지만 여기선 생략)
         .order("published_at", { ascending: false, nullsFirst: false })
@@ -137,6 +137,7 @@ export async function getGrantAnnouncements(): Promise<GrantAnnouncement[]> {
               (row as any).grace_period_months != null ? Number((row as any).grace_period_months) : undefined,
             source,
             url: (row as any).url ? String((row as any).url) : undefined,
+            sourceUrl: (row as any).source_url ? String((row as any).source_url) : undefined,
             // DB에는 start_at 컬럼이 없으므로 published_at을 startAt으로도 사용
             publishedAt,
             startAt: publishedAt,

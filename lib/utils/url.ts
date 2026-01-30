@@ -88,3 +88,13 @@ export function pickAnnouncementViewLink(ann: GrantAnnouncement): AnnouncementVi
   return null;
 }
 
+/**
+ * "원문(수집 출처) 보기" 링크.
+ * - 품질(placeholder) 필터를 적용하지 않고, http(s) URL이면 그대로 노출
+ * - 내부 상담/운영에서 원문 확인 목적 (기관 메인/루트일 수 있음)
+ */
+export function pickAnnouncementSourceLink(ann: GrantAnnouncement): string | null {
+  const u = toHttpUrlOrNull(ann.sourceUrl ?? null);
+  return u ? u.toString() : null;
+}
+

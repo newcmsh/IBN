@@ -141,6 +141,7 @@ export async function GET(request: NextRequest) {
       title: norm.title,
       max_amount: norm.max_amount ?? 0,
       url: norm.url,
+      source_url: norm.url,
       published_at: norm.published_at,
       deadline_at: norm.deadline_at,
       target_criteria: {},

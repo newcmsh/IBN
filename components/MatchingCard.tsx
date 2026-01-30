@@ -2,7 +2,7 @@
 
 import type { MatchResult } from "@/lib/types";
 import { getDDay, getPeriod } from "@/lib/utils/dates";
-import { pickAnnouncementViewLink } from "@/lib/utils/url";
+import { pickAnnouncementSourceLink, pickAnnouncementViewLink } from "@/lib/utils/url";
 
 function formatAmount(n: number): string {
   if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
@@ -50,6 +50,7 @@ export default function MatchingCard({ match, rank }: { match: MatchResult; rank
   const period = getPeriod(startAt, announcement.deadlineAt, announcement.publishedAt);
   const dday = announcement.deadlineAt ? getDDay(announcement.deadlineAt) : { label: null as string | null, daysLeft: null as number | null };
   const viewLink = pickAnnouncementViewLink(announcement);
+  const sourceLink = pickAnnouncementSourceLink(announcement);
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-white/90 p-5 shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:shadow-lg">
@@ -76,18 +77,31 @@ export default function MatchingCard({ match, rank }: { match: MatchResult; rank
       <p className="mt-1 text-sm font-medium text-slate-500">{announcement.agency}</p>
       <h3 className="mt-1 text-base font-semibold text-slate-800">{announcement.title}</h3>
 
-      {viewLink ? (
-        <a
-          href={viewLink.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 inline-block rounded-lg bg-primary-100 px-3 py-1.5 text-sm font-medium text-primary-700 transition hover:bg-primary-200"
-        >
-          공고 바로가기
-        </a>
-      ) : (
-        <p className="mt-2 text-sm text-slate-400">바로보기 링크 없음</p>
-      )}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {viewLink ? (
+          <a
+            href={viewLink.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block rounded-lg bg-primary-100 px-3 py-1.5 text-sm font-medium text-primary-700 transition hover:bg-primary-200"
+          >
+            공고 바로가기
+          </a>
+        ) : (
+          <p className="text-sm text-slate-400">바로보기 링크 없음</p>
+        )}
+
+        {sourceLink && (!viewLink || sourceLink !== viewLink.href) && (
+          <a
+            href={sourceLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+          >
+            원문(출처) 보기
+          </a>
+        )}
+      </div>
 
       {passed ? (
         <>
