@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === "/login") return true;
+  if (pathname === "/signup") return true;
   if (pathname.startsWith("/api/")) return true;
   if (pathname.startsWith("/_next/")) return true;
   if (pathname === "/favicon.ico") return true;
