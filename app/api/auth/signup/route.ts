@@ -24,6 +24,15 @@ function isEmailLike(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
 
+function parseAdminEmails(raw: string | undefined): Set<string> {
+  return new Set(
+    (raw ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
 export async function POST(request: NextRequest) {
   if (!supabaseAdmin) {
     return NextResponse.json(
@@ -53,6 +62,9 @@ export async function POST(request: NextRequest) {
   if (!address) return NextResponse.json({ error: "주소는 필수입니다." }, { status: 400 });
   if (!password) return NextResponse.json({ error: "비밀번호는 필수입니다." }, { status: 400 });
   if (password.length < 8) return NextResponse.json({ error: "비밀번호는 8자 이상을 권장합니다." }, { status: 400 });
+
+  const adminEmails = parseAdminEmails(process.env.ADMIN_EMAILS);
+  const isAdmin = adminEmails.has(email);
 
   // 1) Auth 사용자 생성 (이메일 인증은 운영자 승인으로 대체 → email_confirm=true)
   const created = await supabaseAdmin.auth.admin.createUser({
@@ -91,8 +103,11 @@ export async function POST(request: NextRequest) {
         phone,
         company_name: companyName,
         address,
-        status: "pending",
+        status: isAdmin ? "approved" : "pending",
         requested_at: now,
+        approved_at: isAdmin ? now : null,
+        rejected_at: null,
+        approved_by: isAdmin ? email : null,
         updated_at: now,
       },
       { onConflict: "user_id" }
@@ -106,6 +121,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, autoApproved: isAdmin });
 }
 
