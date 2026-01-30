@@ -43,6 +43,7 @@ export default function LoginClient() {
         password,
       });
       if (signInErr) throw signInErr;
+      // 승인 여부는 middleware에서 /pending으로 리다이렉트됩니다.
       router.replace(redirect);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "로그인 중 오류가 발생했습니다.";

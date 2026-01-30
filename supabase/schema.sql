@@ -147,6 +147,30 @@ CREATE INDEX IF NOT EXISTS idx_company_verifications_user_id ON company_verifica
 CREATE INDEX IF NOT EXISTS idx_company_data_sources_user_id ON company_data_sources(user_id);
 
 -- =============================================================================
+-- 4.5 내부 상담원 계정 프로필/승인 상태 (회원가입 → 운영자 승인 → 사용)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS consultant_profiles (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  phone TEXT,
+  company_name TEXT,
+  address TEXT,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending | approved | rejected
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  approved_at TIMESTAMPTZ,
+  rejected_at TIMESTAMPTZ,
+  approved_by TEXT,
+  note TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_consultant_profiles_email ON consultant_profiles(email);
+CREATE INDEX IF NOT EXISTS idx_consultant_profiles_status ON consultant_profiles(status);
+
+COMMENT ON TABLE consultant_profiles IS '내부 상담원 프로필. 회원가입 시 pending 생성, 운영자 승인(approved) 후 앱 사용 가능.';
+
+-- =============================================================================
 -- 5. RLS 활성화 (정책 적용 전에 활성화)
 -- =============================================================================
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
@@ -157,6 +181,7 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_verifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_data_sources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE industry_master ENABLE ROW LEVEL SECURITY;
+ALTER TABLE consultant_profiles ENABLE ROW LEVEL SECURITY;
 
 -- =============================================================================
 -- 6. RLS 정책 (CREATE POLICY) — 적용 순서: ① user_profiles ② user_id 소유 테이블 ③ 읽기 전용 공고
@@ -214,6 +239,32 @@ CREATE POLICY "company_data_sources_select_own"
   ON company_data_sources FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
+
+-- -----------------------------------------------------------------------------
+-- ②-2 consultant_profiles (내부 상담원 프로필)
+-- - 회원가입: 본인 insert 가능 (pending)
+-- - 본인 select 가능 (승인 상태 확인)
+-- - 본인 update는 pending 상태에서만 가능 (승인/거절 값은 변경 불가)
+-- - 승인/거절 처리는 서버(service_role)에서만 수행 (클라이언트 정책 없음)
+-- -----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "consultant_profiles_select_own" ON consultant_profiles;
+CREATE POLICY "consultant_profiles_select_own"
+  ON consultant_profiles FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "consultant_profiles_insert_own" ON consultant_profiles;
+CREATE POLICY "consultant_profiles_insert_own"
+  ON consultant_profiles FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "consultant_profiles_update_own_pending" ON consultant_profiles;
+CREATE POLICY "consultant_profiles_update_own_pending"
+  ON consultant_profiles FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid() AND status = 'pending' AND approved_at IS NULL AND rejected_at IS NULL)
+  WITH CHECK (user_id = auth.uid() AND status = 'pending' AND approved_at IS NULL AND rejected_at IS NULL);
 
 -- -----------------------------------------------------------------------------
 -- ③ grant_announcements, announcement_sources: 로그인 사용자(authenticated)는 select 가능(읽기 전용)
