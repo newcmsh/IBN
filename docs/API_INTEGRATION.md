@@ -40,23 +40,33 @@
 - **Request Body** (JSON):
   - `companyName` (필수): 회사명
   - `revenue` (필수): 매출액 (원)
-  - `industryName` (선택): 직군/업종
-  - `industryCode` (선택): KSIC 코드
+  - `bizType` (필수): 업태 (문자열 1개 또는 배열). 최소 1개 이상
+  - `items` (필수): 종목 배열. 최소 1개 이상
+  - `industryKeywords` (선택): 매칭 키워드 배열
   - `estDate` (선택): 설립일 YYYY-MM-DD
   - `region` (선택): 지역
-  - `certifications` (선택): 배열, 예: `["벤처인증","수출실적"]`
+  - `certifications` (선택): 인증/자격 키 배열(내부 상담용), 예: `["venture","patent"]`
 
 - **Response** (JSON):
   - `companyName`, `totalExpectedAmount`, `matchCount`
-  - `matches`: 배열 (각 건당 `expectedAmount`, `probability`(적합도 점수 0~100), `amountRange`(conservative/base/optimistic), `announcement`, `reason` 등)
-  - `bestMatch`: 가장 유리한 창구 1건
+  - `recommended`: 추천 공고 배열(passed=true)
+  - `rejected`: 탈락 공고 배열(passed=false)
+  - `bestMatch`: 추천 1순위(없으면 null)
+  - 각 매칭 결과는 `score/confidence/reasons(or rejectReasons)`와 `amountRange`를 포함
 
 예시 (curl):
 
 ```bash
 curl -X POST https://your-domain/api/match \
   -H "Content-Type: application/json" \
-  -d '{"companyName":"(주)테스트","revenue":500000000,"industryName":"제조업"}'
+  -d '{
+    "companyName":"(주)테스트",
+    "revenue":500000000,
+    "bizType":["제조","서비스"],
+    "items":["기술개발","제조"],
+    "industryKeywords":["R&D","연구"],
+    "certifications":["venture","patent"]
+  }'
 ```
 
 ## 기업마당(Bizinfo) 수집 파이프라인 (Ingest)
@@ -75,6 +85,12 @@ curl -X POST https://your-domain/api/match \
 1. **Bizinfo 지원사업 API** 호출 (요청 시 `type=json` 우선, 응답이 XML이면 자동 파싱).
 2. **원문** → `announcement_sources` 테이블에 upsert (`source_name=bizinfo`, `source_ann_id`, `raw_payload`).
 3. **1차 매핑** → `grant_announcements`에 upsert (`title`, `agency`, `url`, `published_at`, `deadline_at`, `max_amount` 등, 가능한 필드만).
+
+### 바로보기 URL 메모
+
+- **URL은 소스별로 제공 여부/품질이 다릅니다.**
+- 초기에는 **bizinfo / k-startup / ntis처럼 상세 URL을 제공하는 소스** 위주로 “공고 바로가기” 버튼을 제공하는 것이 안정적입니다.
+- 본 프로젝트는 placeholder(예: `/example/`) 또는 기관 메인/루트 URL로 보이는 링크는 UI에서 숨기도록 처리합니다.
 
 ### 환경 변수 (서버 전용, 클라이언트 노출 금지)
 
@@ -157,6 +173,37 @@ curl -s -X GET "https://your-domain.com/api/ingest/bizinfo" | jq .
 
 ---
 
+## 중소벤처24(SMES) 공고(민간공고목록정보) 수집 파이프라인 (Ingest)
+
+중소벤처24 OpenAPI(예: 민간공고목록정보 `extPblancInfo`)를 호출해 `announcement_sources`에 원문을 저장하고, 공고성 데이터는 `grant_announcements`에 1차 매핑(upsert)합니다.
+
+- **엔드포인트**: `GET /api/ingest/smes`
+- **저장**:
+  - 원문: `announcement_sources` (`source_name=smes`)
+  - 공고: `grant_announcements` (`source_name=smes`)
+- **응답**: 처리 건수 + `sample` 3개(정규화 일부 필드)
+
+### 환경 변수 (서버 전용)
+
+| 변수 | 필수 | 설명 |
+|------|------|------|
+| `SMES_API_BASE_URL` | ○ | SMES OpenAPI Base URL (extPblancInfo 등) |
+| `SMES_EXT_PBLANC_API_KEY` | ○ | SMES API 인증키 |
+| `NEXT_PUBLIC_SUPABASE_URL` | ○ (DB 저장 시) | Supabase 프로젝트 URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | ○ (DB 저장 시) | RLS 우회용 서비스 롤 키 |
+
+### 테스트 (curl)
+
+```bash
+# 로컬
+curl -s -X GET "http://localhost:3000/api/ingest/smes" | jq .
+
+# 배포
+curl -s -X GET "https://your-domain.com/api/ingest/smes" | jq .
+```
+
+---
+
 ## 창업진흥원 K-Startup 공고 조회 수집 파이프라인 (Ingest)
 
 창업진흥원 K-Startup(사업공고 등) OpenAPI를 호출해 `announcement_sources`에 원문을 저장하고, `grant_announcements`에 1차 매핑(제목·기관·URL·일정·한도)을 upsert합니다. 이후 `source_name=kstartup`으로 LLM 파싱(`/api/ingest/parse`) 연동 가능합니다.
@@ -204,6 +251,37 @@ curl -s -X GET "https://your-domain.com/api/ingest/kstartup" | jq .
 
 ```bash
 curl -s "http://localhost:3000/api/ingest/parse?source_name=kstartup&limit=20" | jq .
+```
+
+---
+
+## KODIT 보증 운영현황(통계) 수집 (Ingest)
+
+KODIT 통계는 “공고”가 아니라서 `grant_announcements`로 매핑하지 않고 **원문만 `announcement_sources`에 저장**합니다.
+
+- **엔드포인트**:
+  - `GET /api/ingest/kodit-stats` (권장)
+  - `GET /api/ingest/kodit/stats` (동일 동작)
+- **저장**: `announcement_sources` (`source_name=kodit_stats`)
+- **응답**: 처리 건수 + `sample` 3개
+
+### 환경 변수 (서버 전용)
+
+| 변수 | 필수 | 설명 |
+|------|------|------|
+| `KODIT_STATS_API_BASE_URL` | ○ | KODIT 통계 API Base URL |
+| `KODIT_STATS_API_KEY` | ○ | KODIT 통계 API 인증키 |
+| `NEXT_PUBLIC_SUPABASE_URL` | ○ (DB 저장 시) | Supabase 프로젝트 URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | ○ (DB 저장 시) | RLS 우회용 서비스 롤 키 |
+
+### 테스트 (curl)
+
+```bash
+# 로컬
+curl -s -X GET "http://localhost:3000/api/ingest/kodit-stats" | jq .
+
+# 배포
+curl -s -X GET "https://your-domain.com/api/ingest/kodit-stats" | jq .
 ```
 
 ---

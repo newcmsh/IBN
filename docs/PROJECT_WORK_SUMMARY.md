@@ -20,8 +20,8 @@
 ### 1.3 구현된 핵심
 - **타입** (`lib/types.ts`): `CompanyProfile`, `GrantAnnouncement`, `TargetCriteria`, `MatchResult`, `MatchingApiResponse`, `DataSource`
 - **매칭 알고리즘** (`lib/matching/algorithm.ts`): 지원금 3단계(보수/기준/최대) `calcAmountRange`, 적합도 점수(0~100, 예상 가능성/적합도) 필수요건 Pass/Fail + 가점, 최적 창구 정렬
-- **매칭 API** (`app/api/match/route.ts`): `POST /api/match` — Body `companyName`, `revenue`, `industryName` 등 → `MatchingApiResponse` 반환
-- **공고 데이터** (`lib/data/grants.ts`): 샘플 공고 5건(중진공, 소진공, 신보, K-Startup, NTIS), `getGrantAnnouncements()` — 추후 Supabase/실제 API 연동
+- **매칭 API** (`app/api/match/route.ts`): `POST /api/match` — Body `companyName`, `revenue`, `bizType`, `items`, `industryKeywords`, `certifications` 등 → `MatchingApiResponse(recommended/rejected)` 반환
+- **공고 데이터** (`lib/data/grants.ts`): Supabase `grant_announcements` 우선 조회(있으면 사용) + fallback 샘플 5건
 - **UI**: `CompanyForm`(기업 정보 입력), `Dashboard`(총 예상 지원금 보수·기준·최대, 매칭 건수), `MatchingCard`(예상 지원금 3단계·적합도 점수·금리·유리한 이유)
 - **메인 페이지** (`app/page.tsx`): 왼쪽 폼, 오른쪽 결과/안내; 폼 제출 → `/api/match` 호출 → 결과 표시
 
@@ -54,12 +54,11 @@
 ## 3. 매칭 정렬 규칙 및 null 처리
 
 ### 3.1 정렬 순서 (기획 반영)
-- **순서**: 금리 낮은 순(오름차순) → 거치기간 긴 순(내림차순) → 확률 내림차순 → 예상지원금 내림차순
-- **구현**: `lib/matching/algorithm.ts`의 `runMatching()` 내부 `sort` 로직
+- **추천(recommended) 정렬**: 적합도 점수(`score`) 내림차순 → 금리(`interestRate`) 오름차순
+- **구현**: `lib/matching/algorithm.ts`의 `runFullMatching()` 내부 `sort` 로직
 
 ### 3.2 null 처리
 - **금리(null)**: `INTEREST_RATE_NULL_SENTINEL = 999` → 해당 기준에서 **맨 뒤**
-- **거치기간(null)**: `GRACE_PERIOD_NULL_SENTINEL = -1` → 해당 기준에서 **맨 뒤**
 
 ### 3.3 추가·수정된 파일
 | 파일 | 내용 |

@@ -79,8 +79,10 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({
       ok: true,
       message: "수집된 공고가 없습니다.",
+      itemsFetched: 0,
       sourcesUpserted: 0,
       grantsUpserted: 0,
+      sample: [],
     });
   }
 
@@ -94,6 +96,7 @@ export async function GET(_request: NextRequest) {
 
   let sourcesUpserted = 0;
   let grantsUpserted = 0;
+  const sample: Array<Record<string, unknown>> = [];
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i] as KstartupRawItem;
@@ -112,6 +115,18 @@ export async function GET(_request: NextRequest) {
       );
 
     if (!errSource) sourcesUpserted++;
+
+    if (sample.length < 3) {
+      sample.push({
+        source_ann_id: norm.source_ann_id,
+        title: norm.title,
+        agency: norm.agency,
+        url: norm.url,
+        published_at: norm.published_at,
+        deadline_at: norm.deadline_at,
+        max_amount: norm.max_amount,
+      });
+    }
 
     const row: Record<string, unknown> = {
       source_name: SOURCE_NAME,
@@ -139,5 +154,6 @@ export async function GET(_request: NextRequest) {
     itemsFetched: items.length,
     sourcesUpserted,
     grantsUpserted,
+    sample,
   });
 }

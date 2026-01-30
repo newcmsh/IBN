@@ -32,7 +32,10 @@ export interface GrantAnnouncement {
   interestRate?: number;    // 금리 (%)
   gracePeriodMonths?: number; // 거치기간 (월)
   source: DataSource;       // 데이터 출처
+  /** 가장 신뢰 가능한 바로보기 링크 (없거나 placeholder면 UI에서 숨김) */
   url?: string;
+  /** 원문 저장/수집 출처 링크 (예: bizinfo 상세 링크). url이 없으면 이 값을 사용 */
+  sourceUrl?: string;
   /** 공고 게시일 (ISO) */
   publishedAt?: string;
   /** 접수 시작일 (ISO). 없으면 publishedAt 사용 */
@@ -43,6 +46,7 @@ export interface GrantAnnouncement {
 
 export type DataSource =
   | "bizinfo"      // 기업마당
+  | "smes"         // 중소벤처24(중소벤처기업부/중기부)
   | "subsidy24"    // 보조금24
   | "kosbi"        // 중진공
   | "sbc"          // 소진공

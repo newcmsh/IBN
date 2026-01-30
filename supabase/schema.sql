@@ -161,16 +161,19 @@ ALTER TABLE industry_master ENABLE ROW LEVEL SECURITY;
 -- -----------------------------------------------------------------------------
 -- ① user_profiles: auth.uid() = id 인 사용자만 select / insert / update 가능
 -- -----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "user_profiles_select_own" ON user_profiles;
 CREATE POLICY "user_profiles_select_own"
   ON user_profiles FOR SELECT
   TO authenticated
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "user_profiles_insert_own" ON user_profiles;
 CREATE POLICY "user_profiles_insert_own"
   ON user_profiles FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "user_profiles_update_own" ON user_profiles;
 CREATE POLICY "user_profiles_update_own"
   ON user_profiles FOR UPDATE
   TO authenticated
@@ -183,21 +186,25 @@ CREATE POLICY "user_profiles_update_own"
 -- ② matching_results, notifications, company_verifications, company_data_sources:
 --    user_id = auth.uid() 인 행만 select 가능. insert/update/delete 정책 없음(서버 전용).
 -- -----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "matching_results_select_own" ON matching_results;
 CREATE POLICY "matching_results_select_own"
   ON matching_results FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "notifications_select_own" ON notifications;
 CREATE POLICY "notifications_select_own"
   ON notifications FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "company_verifications_select_own" ON company_verifications;
 CREATE POLICY "company_verifications_select_own"
   ON company_verifications FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "company_data_sources_select_own" ON company_data_sources;
 CREATE POLICY "company_data_sources_select_own"
   ON company_data_sources FOR SELECT
   TO authenticated
@@ -207,11 +214,13 @@ CREATE POLICY "company_data_sources_select_own"
 -- ③ grant_announcements, announcement_sources: 로그인 사용자(authenticated)는 select 가능(읽기 전용)
 --    insert/update/delete 정책 없음 — 서버(service_role) 전용.
 -- -----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "grant_announcements_select_authenticated" ON grant_announcements;
 CREATE POLICY "grant_announcements_select_authenticated"
   ON grant_announcements FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "announcement_sources_select_authenticated" ON announcement_sources;
 CREATE POLICY "announcement_sources_select_authenticated"
   ON announcement_sources FOR SELECT
   TO authenticated
@@ -220,6 +229,7 @@ CREATE POLICY "announcement_sources_select_authenticated"
 -- -----------------------------------------------------------------------------
 -- industry_master: authenticated SELECT (드롭다운/자동완성용)
 -- -----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "industry_master_select_authenticated" ON industry_master;
 CREATE POLICY "industry_master_select_authenticated"
   ON industry_master FOR SELECT
   TO authenticated

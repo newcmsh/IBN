@@ -1,49 +1,41 @@
 /**
- * 기업마당(Bizinfo) 지원사업 API 수집 파이프라인
- *
- * 선택: Next.js Route Handler (권장)
- * - BIZINFO_API_KEY를 process.env로만 사용 → 클라이언트 노출 없음
- * - 같은 레포에서 배포·로깅·스케줄 연동이 쉬움
- * - Supabase Edge Function은 별도 배포·env 설정 필요
- *
- * 동작:
- * - Bizinfo API 호출 (JSON 요청, XML 응답 시 파싱)
- * - 원문 → announcement_sources upsert (raw_payload)
- * - 1차 매핑 → grant_announcements upsert (title, agency, url, published_at, deadline_at, max_amount)
- *
- * 환경변수: BIZINFO_API_KEY, BIZINFO_API_BASE_URL(선택), NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ * 중소벤처24 공고(민간공고목록정보=extPblancInfo 등) 수집 파이프라인
+ * GET /api/ingest/smes
+ * - SMES_API_BASE_URL, SMES_EXT_PBLANC_API_KEY 사용 (서버 전용, 노출 금지)
+ * - 원문 → announcement_sources upsert (source_name='smes', source_ann_id, raw_payload)
+ * - 공고성 데이터 → grant_announcements upsert (가능한 필드만 1차 매핑)
+ * - 응답은 파싱된 sample 3개 포함
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { parseApiResponse } from "@/lib/ingest/parseResponse";
-import {
-  SOURCE_NAME,
-  extractItemsFromResponse,
-  normalizeItem,
-  type BizinfoRawItem,
-} from "@/lib/ingest/bizinfo";
-
-/** 실제 URL은 기업마당 정책정보 개방 또는 공공데이터포털 API 명세 확인 후 BIZINFO_API_BASE_URL로 설정 */
-const DEFAULT_BIZINFO_BASE_URL = "https://www.bizinfo.go.kr/api/supportList";
+import { SOURCE_NAME, extractItemsFromResponse, normalizeItem, type SmesRawItem } from "@/lib/ingest/smes";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const apiKey = process.env.BIZINFO_API_KEY;
+  const baseUrl = process.env.SMES_API_BASE_URL?.trim();
+  const apiKey = process.env.SMES_EXT_PBLANC_API_KEY;
+
+  if (!baseUrl) {
+    return NextResponse.json({ error: "SMES_API_BASE_URL이 설정되지 않았습니다." }, { status: 500 });
+  }
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "BIZINFO_API_KEY가 설정되지 않았습니다." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "SMES_EXT_PBLANC_API_KEY가 설정되지 않았습니다." }, { status: 500 });
   }
 
-  const baseUrl =
-    process.env.BIZINFO_API_BASE_URL?.trim() || DEFAULT_BIZINFO_BASE_URL;
   const url = new URL(baseUrl);
+  // 흔한 data.go.kr 패턴
   url.searchParams.set("serviceKey", apiKey);
-  url.searchParams.set("type", "json"); // JSON 우선 요청 (API가 지원 시)
+  url.searchParams.set("returnType", "JSON");
+
+  // 호출자가 추가 쿼리(pageNo/numOfRows 등)를 넣을 수 있도록 전달(충돌 키는 제외)
+  request.nextUrl.searchParams.forEach((v, k) => {
+    if (k === "serviceKey" || k === "returnType") return;
+    url.searchParams.set(k, v);
+  });
 
   let res: Response;
   try {
@@ -53,9 +45,9 @@ export async function GET(request: NextRequest) {
       next: { revalidate: 0 },
     });
   } catch {
-    console.error("Bizinfo API fetch error");
+    // fetch 실패면 원문 저장 불가
     return NextResponse.json(
-      { error: "Bizinfo API 요청에 실패했습니다.", detail: "FETCH_ERROR" },
+      { error: "SMES API 요청에 실패했습니다.", detail: "FETCH_ERROR" },
       { status: 502 }
     );
   }
@@ -65,7 +57,7 @@ export async function GET(request: NextRequest) {
 
   if (!res.ok) {
     return NextResponse.json(
-      { error: "Bizinfo API 오류", status: res.status, body: text.slice(0, 500) },
+      { error: "SMES API 오류", status: res.status, body: text.slice(0, 500) },
       { status: 502 }
     );
   }
@@ -73,7 +65,7 @@ export async function GET(request: NextRequest) {
   const parsed = parseApiResponse(text, contentType);
   if (parsed == null) {
     return NextResponse.json(
-      { error: "API 응답 파싱 실패 (JSON/XML 아님 또는 형식 오류)" },
+      { error: "API 응답 파싱 실패 (JSON/XML 형식 확인)" },
       { status: 502 }
     );
   }
@@ -103,10 +95,10 @@ export async function GET(request: NextRequest) {
   const sample: Array<Record<string, unknown>> = [];
 
   for (let i = 0; i < items.length; i++) {
-    const item = items[i] as BizinfoRawItem;
+    const item = items[i] as SmesRawItem;
     const norm = normalizeItem(item, i);
 
-    // announcement_sources: 원문 upsert
+    // 1) 원문 upsert (최대한 수행)
     const { error: errSource } = await admin
       .from("announcement_sources")
       .upsert(
@@ -118,9 +110,9 @@ export async function GET(request: NextRequest) {
         },
         { onConflict: "source_name,source_ann_id" }
       );
-
     if (!errSource) sourcesUpserted++;
 
+    // sample (최대 3개) – 키/원문 일부만
     if (sample.length < 3) {
       sample.push({
         source_ann_id: norm.source_ann_id,
@@ -133,7 +125,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // grant_announcements: 1차 매핑 upsert (title, agency, url, published_at, deadline_at, max_amount)
+    // 2) 공고 upsert (가능한 필드만)
     const row: Record<string, unknown> = {
       source_name: SOURCE_NAME,
       source_ann_id: norm.source_ann_id,
@@ -150,16 +142,16 @@ export async function GET(request: NextRequest) {
     const { error: errGrant } = await admin
       .from("grant_announcements")
       .upsert(row, { onConflict: "source_name,source_ann_id" });
-
     if (!errGrant) grantsUpserted++;
   }
 
   return NextResponse.json({
     ok: true,
-    message: "Bizinfo 수집 완료",
+    message: "SMES 수집 완료",
     itemsFetched: items.length,
     sourcesUpserted,
     grantsUpserted,
     sample,
   });
 }
+

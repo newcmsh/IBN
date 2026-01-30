@@ -79,6 +79,7 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({
       processed: 0,
       rows: 0,
+      sample: [],
     });
   }
 
@@ -113,5 +114,6 @@ export async function GET(_request: NextRequest) {
   return NextResponse.json({
     processed,
     rows: rows.length,
+    sample: rows.slice(0, 3),
   });
 }
