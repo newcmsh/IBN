@@ -22,6 +22,9 @@ export default function SignupClient() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const passwordMismatch = password2.length > 0 && password !== password2;
+  const passwordMatch = password2.length > 0 && password.length > 0 && password === password2;
+
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -73,37 +76,31 @@ export default function SignupClient() {
 
     setLoading(true);
     try {
-      const { data, error: signUpErr } = await supabase.auth.signUp({
+      // 서버에서 계정 생성 + 승인요청 저장 (운영자 승인 구조)
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          companyName: companyName.trim(),
+          address: address.trim(),
+          password,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !json.ok) throw new Error(json.error || `회원가입 실패 (${res.status})`);
+
+      // 계정 생성 후 로그인 시도(성공하면 승인대기로 이동)
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
-      if (signUpErr) throw signUpErr;
-
-      // 로그인 세션이 없을 수 있으니, 가능하면 즉시 로그인(이메일 인증이 켜진 경우 실패할 수 있음)
-      if (!data.session) {
-        await supabase.auth.signInWithPassword({ email: email.trim(), password }).catch(() => {});
-      }
-
-      // 프로필/승인 상태 저장 (승인 전까지는 pending)
-      const userId = data.user?.id;
-      if (userId) {
-        const { error: profileErr } = await supabase
-          .from("consultant_profiles")
-          .upsert(
-            {
-              user_id: userId,
-              email: email.trim(),
-              full_name: fullName.trim(),
-              phone: phone.trim(),
-              company_name: companyName.trim(),
-              address: address.trim(),
-              status: "pending",
-              requested_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id" }
-          );
-        if (profileErr) throw profileErr;
+      if (signInErr) {
+        setSuccess("회원가입이 완료되었습니다. 운영자 승인 대기 중입니다. 로그인 화면에서 다시 로그인해 주세요.");
+        router.replace(`/login?redirect=${encodeURIComponent("/pending")}`);
+        return;
       }
 
       // 승인 대기 화면으로 이동 (승인 전에는 메인 접근 불가)
@@ -208,11 +205,17 @@ export default function SignupClient() {
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm placeholder:text-slate-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
                 placeholder="비밀번호를 한 번 더 입력"
               />
+              {passwordMismatch && (
+                <p className="mt-1 text-xs font-medium text-rose-600">비밀번호가 일치하지 않습니다.</p>
+              )}
+              {passwordMatch && (
+                <p className="mt-1 text-xs font-medium text-green-600">비밀번호가 일치합니다.</p>
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || passwordMismatch}
               className="w-full rounded-xl bg-primary-500 py-3 text-sm font-semibold text-white shadow-md shadow-primary-200 transition hover:bg-primary-400 hover:shadow-lg disabled:opacity-50"
             >
               {loading ? "가입 중..." : "회원가입"}
