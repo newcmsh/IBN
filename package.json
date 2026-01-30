@@ -14,6 +14,7 @@
     "electron:build": "npm run electron:write-url && npm run electron:compile && electron-builder"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.39.0",
     "fast-xml-parser": "^4.3.2",
     "next": "14.2.35",
@@ -52,7 +53,9 @@
       }
     ],
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "nsis": {
       "oneClick": false,

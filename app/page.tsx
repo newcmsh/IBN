@@ -6,11 +6,24 @@ import type { CompanyFormData } from "@/components/CompanyForm";
 import CompanyForm from "@/components/CompanyForm";
 import Dashboard from "@/components/Dashboard";
 import { parseRevenueNumber } from "@/lib/utils/koreanNumber";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
   const [result, setResult] = useState<MatchingApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleSignOut = async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      router.replace("/login");
+      return;
+    }
+    await supabase.auth.signOut();
+    router.replace("/login");
+  };
 
   const handleSubmit = async (data: CompanyFormData) => {
     setLoading(true);
@@ -53,6 +66,15 @@ export default function Home() {
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-slate-900">IBN 정책자금 스마트 매칭</h1>
             <p className="mt-0.5 text-sm text-slate-500">내 기업에 딱 맞는 지원금, 부드럽게 한눈에</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              로그아웃
+            </button>
           </div>
         </div>
       </header>
