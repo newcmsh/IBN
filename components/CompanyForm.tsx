@@ -39,6 +39,15 @@ const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8
 /** 업태 드롭다운 하드코딩 (엑셀/업종마스터 미사용) */
 const BIZ_TYPES = ["제조", "도소매", "서비스", "건설", "운수", "숙박음식", "정보통신", "농축수산", "기타"];
 
+/** 인증/자격 대분류 라벨(화면 길이 축소용) */
+const CERT_GROUP_LABEL: Record<string, string> = {
+  "기업 인증": "기업인증",
+  "기술·지식재산": "기술 지식재산",
+  "품질·경영·보안": "품질 경영 보안",
+  "수출·글로벌": "수출 글로벌",
+  "증빙 가능 상태(상담 참고용)": "증빙가능상태",
+};
+
 export default function CompanyForm({
   onSubmit,
   loading,
@@ -51,6 +60,10 @@ export default function CompanyForm({
   const [verifyMessage, setVerifyMessage] = useState<string>("");
   const [itemInput, setItemInput] = useState("");
   const [keywordInput, setKeywordInput] = useState("");
+  const [openCertGroups, setOpenCertGroups] = useState<Record<string, boolean>>({
+    // 기본으로 첫 그룹만 펼침
+    "기업 인증": true,
+  });
 
   const handleVerify = async () => {
     const raw = form.bizNo.trim();
@@ -393,37 +406,71 @@ export default function CompanyForm({
       </div>
       <div>
         <p className="mb-2 text-sm font-medium text-slate-600">인증/자격 보유 여부 (내부 상담용)</p>
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-          {CERTIFICATION_GROUPS.map((grp) => (
-            <div key={grp.group}>
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {grp.group}
-              </p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
-                {grp.items.map((item) => (
-                  <label
-                    key={item.key}
-                    className="flex cursor-pointer items-center gap-2 text-sm text-slate-700"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={form.certifications.includes(item.key)}
-                      onChange={(e) => {
-                        setForm((p) => ({
-                          ...p,
-                          certifications: e.target.checked
-                            ? [...p.certifications, item.key]
-                            : p.certifications.filter((k) => k !== item.key),
-                        }));
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span>{item.label}</span>
-                  </label>
-                ))}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/50">
+          {CERTIFICATION_GROUPS.map((grp, idx) => {
+            const open = openCertGroups[grp.group] ?? false;
+            const selectedCount = grp.items.filter((i) => form.certifications.includes(i.key)).length;
+            const label = CERT_GROUP_LABEL[grp.group] ?? grp.group;
+            return (
+              <div key={grp.group} className={idx === 0 ? "" : "border-t border-slate-200"}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenCertGroups((p) => {
+                      const currentlyOpen = p[grp.group] ?? false;
+                      // 한 번에 하나만 펼치기: 열려 있으면 전체 닫기, 닫혀 있으면 이 그룹만 열기
+                      return currentlyOpen ? {} : { [grp.group]: true };
+                    })
+                  }
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                  aria-expanded={open}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">{label}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      선택 {selectedCount} / {grp.items.length}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedCount > 0 && (
+                      <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
+                        {selectedCount}
+                      </span>
+                    )}
+                    <span className="text-slate-400">{open ? "▾" : "▸"}</span>
+                  </div>
+                </button>
+
+                {open && (
+                  <div className="px-4 pb-4">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+                      {grp.items.map((item) => (
+                        <label
+                          key={item.key}
+                          className="flex cursor-pointer items-center gap-2 text-sm text-slate-700"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={form.certifications.includes(item.key)}
+                            onChange={(e) => {
+                              setForm((p) => ({
+                                ...p,
+                                certifications: e.target.checked
+                                  ? [...p.certifications, item.key]
+                                  : p.certifications.filter((k) => k !== item.key),
+                              }));
+                            }}
+                            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span>{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       <button
