@@ -31,6 +31,8 @@
     "electron-builder": "^24.9.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.35",
+    "jimp": "^1.6.0",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.0",
@@ -38,7 +40,7 @@
   },
   "build": {
     "appId": "com.ibn.policy-fund-matching",
-    "productName": "정책자금 스마트 매칭",
+    "productName": "IBN 정책자금 스마트 매칭",
     "executableName": "IBN-PolicyFund-Matching",
     "directories": {
       "output": "dist"
@@ -54,13 +56,16 @@
       }
     ],
     "win": {
-      "artifactName": "IBN-PolicyFund-Matching-Setup-${version}.${ext}",
+      "artifactName": "IBN 정책자금 스마트 매칭 설치 ${version}.${ext}",
+      "icon": "public/icon.ico",
       "signAndEditExecutable": false,
       "target": [
         "nsis"
       ]
     },
     "nsis": {
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
