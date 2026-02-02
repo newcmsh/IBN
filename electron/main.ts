@@ -9,7 +9,9 @@ import { app, BrowserWindow, shell, Menu } from "electron";
 import * as path from "path";
 import * as fs from "fs";
 
-const isDev = process.env.NODE_ENV !== "production";
+// packaged(EXE)에서는 반드시 Vercel URL을 로드해야 하므로,
+// NODE_ENV 대신 app.isPackaged로 개발/프로덕션을 판별합니다.
+const isDev = !app.isPackaged;
 
 // Windows 작업표시줄/창 타이틀에 앱 이름 반영
 app.setName("IBN 정책자금 스마트 매칭");
@@ -32,7 +34,7 @@ function getAppUrl(): string {
     const configPath = path.join(resourcesPath, "electron-app-url.json");
     if (fs.existsSync(configPath)) {
       const data = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      if (data.appUrl) return data.appUrl;
+      if (typeof data?.appUrl === "string" && data.appUrl.trim()) return data.appUrl.trim();
     }
   } catch {
     // ignore
