@@ -53,7 +53,7 @@ export default function MatchingCard({ match, rank }: { match: MatchResult; rank
   const sourceLink = pickAnnouncementSourceLink(announcement);
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white/90 p-5 shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:shadow-lg">
+    <div className="break-keep rounded-2xl border border-slate-100 bg-white/90 p-5 shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:shadow-lg">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         {passed && rank != null && (
           <span className="inline-block rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-medium text-primary-700">
@@ -105,35 +105,42 @@ export default function MatchingCard({ match, rank }: { match: MatchResult; rank
 
       {passed ? (
         <>
-          <div className="mt-4 flex flex-wrap gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs text-slate-500">예상 지원금 (보수 · 기준 · 최대)</p>
-              <p className="mt-0.5 text-sm font-semibold text-slate-800">
-                <span className="text-slate-600">{formatAmount(conservative)}</span>
-                <span className="mx-1.5 text-slate-400">·</span>
-                <span className="text-accent-600">{formatAmount(base)}</span>
-                <span className="mx-1.5 text-slate-400">·</span>
-                <span className="text-slate-700">{formatAmount(optimistic)}</span>
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">적합도 점수</p>
-              <p className="text-lg font-bold text-primary-600">{score}</p>
-            </div>
-            {confidence && (
-              <div>
-                <p className="text-xs text-slate-500">신뢰도</p>
-                <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${CONFIDENCE_CLASS[confidence] ?? "bg-slate-100 text-slate-600"}`}>
-                  {CONFIDENCE_LABEL[confidence] ?? confidence}
-                </span>
+          <div className="mt-4 grid gap-4 md:grid-cols-12">
+            <div className="md:col-span-7">
+              <p className="text-xs text-slate-500">예상 지원금 (보수·기준·최대)</p>
+              <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm font-semibold text-slate-800">
+                <span className="whitespace-nowrap text-slate-600">{formatAmount(conservative)}</span>
+                <span className="text-slate-400">·</span>
+                <span className="whitespace-nowrap text-accent-600">{formatAmount(base)}</span>
+                <span className="text-slate-400">·</span>
+                <span className="whitespace-nowrap text-slate-700">{formatAmount(optimistic)}</span>
               </div>
-            )}
-            {announcement.interestRate != null && (
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 md:col-span-5 md:grid-cols-3">
               <div>
-                <p className="text-xs text-slate-500">금리</p>
-                <p className="text-lg font-semibold text-slate-700">{announcement.interestRate}%</p>
+                <p className="text-xs text-slate-500">적합도 점수</p>
+                <p className="text-lg font-bold text-primary-600">{score}</p>
               </div>
-            )}
+              {confidence && (
+                <div>
+                  <p className="text-xs text-slate-500">신뢰도</p>
+                  <span
+                    className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+                      CONFIDENCE_CLASS[confidence] ?? "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {CONFIDENCE_LABEL[confidence] ?? confidence}
+                  </span>
+                </div>
+              )}
+              {announcement.interestRate != null && (
+                <div>
+                  <p className="text-xs text-slate-500">금리</p>
+                  <p className="whitespace-nowrap text-lg font-semibold text-slate-700">{announcement.interestRate}%</p>
+                </div>
+              )}
+            </div>
           </div>
           {reasons.length > 0 && (
             <ul className="mt-3 list-inside list-disc space-y-0.5 text-sm text-slate-600">

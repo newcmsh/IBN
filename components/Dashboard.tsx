@@ -117,7 +117,7 @@ export default function Dashboard({ result }: { result: MatchingApiResponse }) {
 
         {activeTab === "recommended" && (
           <div className="max-h-[60vh] overflow-y-auto">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-4">
               {filteredRecommended.map((m) => (
                 <MatchingCard key={m.announcement.annId} match={m} rank={m.rank} />
               ))}
@@ -127,7 +127,7 @@ export default function Dashboard({ result }: { result: MatchingApiResponse }) {
 
         {activeTab === "rejected" && (
           <div className="max-h-[60vh] overflow-y-auto">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-4">
               {filteredRejected.map((m) => (
                 <MatchingCard key={m.announcement.annId} match={m} />
               ))}
