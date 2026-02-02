@@ -60,8 +60,10 @@ npm run electron:build
 ### 2.3 빌드 결과
 
 - **출력 디렉터리:** `dist/`
-- **설치 exe:** `dist/정책자금 스마트 매칭 Setup x.x.x.exe` (NSIS)
+- **설치 exe(권장 배포 파일):** `dist/IBN-PolicyFund-Matching-Setup-x.x.x.exe` (NSIS)
 - 설치 시 설치 경로 변경 가능(oneClick: false)
+
+> 참고: Windows 환경에서 한글 파일명/경로가 섞이면 `rcedit` 단계에서 빌드가 실패하는 경우가 있어, 현재 설정은 **EXE 파일명은 영문(ASCII)** 으로 생성되도록 맞춰져 있습니다.
 
 ### 2.4 생성 파일 / .gitignore (선택)
 
@@ -109,3 +111,6 @@ npm run electron:build
   - `npm run electron:write-url`이 먼저 실행되므로, `NEXT_PUBLIC_APP_URL`을 설정한 뒤 `npm run electron:build`를 한 번에 실행하면 됩니다. (`electron:build`가 `electron:write-url`을 호출함)
 - **외부 링크가 Electron 창 안에서 열릴 때**
   - `main.ts`의 `setWindowOpenHandler` / `will-navigate`가 적용된 상태로 다시 빌드했는지 확인.
+
+- **EXE에서 관리자 승인 페이지로 들어가고 싶은데 주소창이 없을 때**
+  - 상단 메뉴의 **관리자 → 회원가입 승인관리 열기**를 사용합니다. (단축키: `Ctrl+Shift+A`)

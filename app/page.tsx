@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { MatchingApiResponse } from "@/lib/types";
 import type { CompanyFormData } from "@/components/CompanyForm";
 import CompanyForm from "@/components/CompanyForm";
@@ -8,12 +8,32 @@ import Dashboard from "@/components/Dashboard";
 import { parseRevenueNumber } from "@/lib/utils/koreanNumber";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function Home() {
   const router = useRouter();
   const [result, setResult] = useState<MatchingApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/me", { method: "GET" });
+        const json = (await res.json().catch(() => ({}))) as { isAdmin?: boolean };
+        if (!mounted) return;
+        setIsAdmin(json?.isAdmin === true);
+      } catch {
+        if (!mounted) return;
+        setIsAdmin(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSignOut = async () => {
     const supabase = getSupabaseBrowserClient();
@@ -68,6 +88,14 @@ export default function Home() {
             <p className="mt-0.5 text-sm text-slate-500">내 기업에 딱 맞는 지원금, 부드럽게 한눈에</p>
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Link
+                href="/admin/approvals"
+                className="rounded-xl bg-slate-900/90 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-900"
+              >
+                승인관리
+              </Link>
+            )}
             <button
               type="button"
               onClick={handleSignOut}

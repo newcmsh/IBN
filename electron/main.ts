@@ -6,6 +6,7 @@
  */
 
 import { app, BrowserWindow, shell } from "electron";
+import { Menu } from "electron";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -54,10 +55,46 @@ function createWindow(): void {
   const appUrl = getAppUrl();
   mainWindow.loadURL(appUrl);
 
+  // EXE에는 주소창이 없으므로, 메뉴로 관리자 페이지 접근 제공
+  const appOrigin = new URL(appUrl).origin;
+  const template = [
+    {
+      label: "파일",
+      submenu: [{ role: "quit", label: "종료" }],
+    },
+    {
+      label: "관리자",
+      submenu: [
+        {
+          label: "회원가입 승인관리 열기",
+          accelerator: "Ctrl+Shift+A",
+          click: () => {
+            mainWindow.loadURL(`${appOrigin}/admin/approvals`);
+          },
+        },
+      ],
+    },
+    {
+      label: "보기",
+      submenu: [
+        { role: "reload", label: "새로고침" },
+        { role: "toggledevtools", label: "개발자 도구" },
+        { type: "separator" },
+        { role: "resetzoom", label: "확대 초기화" },
+        { role: "zoomin", label: "확대" },
+        { role: "zoomout", label: "축소" },
+        { type: "separator" },
+        { role: "togglefullscreen", label: "전체화면" },
+      ],
+    },
+  ] as const;
+
+  const menu = Menu.buildFromTemplate(template as any);
+  Menu.setApplicationMenu(menu);
+
   // 새 창 요청 시 외부 링크는 기본 브라우저로 열기
   mainWindow.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
     const u = new URL(url);
-    const appOrigin = new URL(appUrl).origin;
     if (u.origin !== appOrigin) {
       shell.openExternal(url);
       return { action: "deny" };
@@ -68,7 +105,6 @@ function createWindow(): void {
   // 링크 클릭 시 target=_blank 또는 외부 도메인은 기본 브라우저로
   mainWindow.webContents.on("will-navigate", (event: { preventDefault: () => void }, url: string) => {
     const u = new URL(url);
-    const appOrigin = new URL(appUrl).origin;
     if (u.origin !== appOrigin) {
       event.preventDefault();
       shell.openExternal(url);
