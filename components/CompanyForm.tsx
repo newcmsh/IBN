@@ -378,14 +378,16 @@ export default function CompanyForm({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      {/* 좌측 폼 폭(약 340px)에서도 깨지지 않도록 1열 고정 */}
+      <div className="grid grid-cols-1 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-600">설립일</label>
-          <div className="mt-1 flex gap-2">
+          {/* 3개 셀렉트가 항상 보이도록 3칸 그리드 */}
+          <div className="mt-1 grid grid-cols-3 gap-2">
             <select
               value={estDateParts.year}
               onChange={(e) => handleEstDateChange("year", e.target.value)}
-              className="flex-1 rounded-xl border border-slate-200 px-2 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              className="w-full rounded-xl border border-slate-200 px-2 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
               aria-label="연도"
             >
               <option value="">연도</option>
@@ -400,7 +402,7 @@ export default function CompanyForm({
             <select
               value={estDateParts.month}
               onChange={(e) => handleEstDateChange("month", e.target.value)}
-              className="flex-1 rounded-xl border border-slate-200 px-2 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              className="w-full rounded-xl border border-slate-200 px-2 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
               aria-label="월"
             >
               <option value="">월</option>
@@ -413,7 +415,7 @@ export default function CompanyForm({
             <select
               value={estDateParts.day}
               onChange={(e) => handleEstDateChange("day", e.target.value)}
-              className="flex-1 rounded-xl border border-slate-200 px-2 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              className="w-full rounded-xl border border-slate-200 px-2 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
               aria-label="일"
             >
               <option value="">일</option>
@@ -447,7 +449,7 @@ export default function CompanyForm({
               <button
                 type="button"
                 onClick={() => setAddressOpen(true)}
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                className="flex-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 우편번호 검색
               </button>
@@ -553,7 +555,8 @@ export default function CompanyForm({
         <div className="space-y-3">
           <div className="rounded-xl border border-rose-200/70 bg-rose-50/40 p-4">
             <p className="mb-2 text-xs font-semibold text-rose-800">결격/중대(하드)</p>
-            <div className="grid grid-cols-2 gap-2">
+            {/* 긴 라벨이 많은 영역: 좁은 폼 폭에서도 깨지지 않도록 1열 */}
+            <div className="grid grid-cols-1 gap-2">
               {PENALTY_HARD_ITEMS.map((it) => {
                 const checked = !!form.penalties?.[it.key];
                 return (
@@ -580,7 +583,7 @@ export default function CompanyForm({
 
           <div className="rounded-xl border border-amber-200/60 bg-amber-50/30 p-4">
             <p className="mb-2 text-xs font-semibold text-amber-900">리스크(감점)</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {PENALTY_SOFT_ITEMS.map((it) => {
                 const checked = !!form.penalties?.[it.key];
                 return (
