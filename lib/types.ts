@@ -4,6 +4,22 @@
  */
 
 /** 기업(신청 기업) 프로필 - 컨설팅 신청 시 입력. 업태/종목/키워드 기반 (industryCode·industryName 미사용) */
+export type PenaltyFlags = {
+  // Hard fail 후보(공고/기관에서 자주 결격 처리되는 것)
+  taxArrears?: boolean; // 국세 체납
+  localTaxArrears?: boolean; // 지방세 체납
+  fourInsArrears?: boolean; // 4대보험 체납
+  inDefault?: boolean; // 금융 연체/채무불이행(현재)
+  inRehabBankruptcy?: boolean; // 회생/파산/청산 진행
+  businessClosed?: boolean; // 휴/폐업(사업자상태)
+
+  // Soft risk(감점)
+  pastDefaultResolved?: boolean; // 과거 연체 있으나 해소
+  guaranteeAccidentResolved?: boolean; // 과거 보증사고 해소
+  guaranteeAccidentUnresolved?: boolean; // 보증사고 미해소
+  highDebtSuspected?: boolean; // 과다차입 의심(확실하지않음, 내부 체크)
+};
+
 export interface CompanyProfile {
   id?: string;
   companyName: string;       // 회사명
@@ -15,9 +31,22 @@ export interface CompanyProfile {
   /** 매칭용 키워드 배열 [선택] */
   industryKeywords?: string[];
   estDate?: string;          // 설립일 (YYYY-MM-DD)
-  region?: string;           // 지역 (시/도)
+  /** (레거시) 지역 (시/도). 새 구현은 regionSido/regionSigungu 사용 권장 */
+  region?: string;
+  /** 우편번호 */
+  zipcode?: string;
+  /** 기본주소(도로명/지번) */
+  address1?: string;
+  /** 상세주소 */
+  address2?: string;
+  /** 시/도 */
+  regionSido?: string;
+  /** 시/군/구 */
+  regionSigungu?: string;
   /** 정책자금 유리 인증/자격 키 배열 (내부 상담용, 보유 여부만 관리) */
   certifications?: string[];
+  /** 감점요소(신용/여신/보증 리스크) — 내부 상담용 사전 판단 */
+  penalties?: PenaltyFlags;
   bizNo?: string;            // 사업자번호 (자동 연동 시)
   createdAt?: string;
 }
@@ -108,11 +137,20 @@ export interface MatchResult {
   reason: string;
   /** 추천 순위 (recommended에서만 1..N 부여) */
   rank?: number;
+
+  /** 점수 구성(요약): 기본(base) + 가점(bonus) - 감점(penalty) = final */
+  scoreBreakdown?: { base: number; bonus: number; penalty: number; final: number };
+  /** 하드 결격/경고 플래그 */
+  flags?: { hardFail: boolean; hardFailReasons: string[]; warnings: string[] };
 }
 
 /** Open API 응답 - 추천/탈락 전부 포함 */
 export interface MatchingApiResponse {
   companyName: string;
+  /** 요청 기업의 시/도(주소 기반) */
+  regionSido?: string;
+  /** 요청 기업의 시/군/구(주소 기반) */
+  regionSigungu?: string;
   /** 추천 공고 (passed=true) */
   recommended: MatchResult[];
   /** 탈락 공고 (passed=false) */

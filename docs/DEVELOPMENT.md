@@ -129,7 +129,11 @@ IBN/
 | items | string[] | ○ | 종목 텍스트 배열. **최소 1개** |
 | industryKeywords | string[] | | 매칭 키워드(종목에서 자동 반영 + 추가/삭제 가능) |
 | estDate | string | | 설립일 (YYYY-MM-DD) |
-| region | string | | 지역 (시/도) |
+| zipcode | string | | 우편번호 |
+| address1 | string | | 기본주소(도로명/지번) |
+| address2 | string | | 상세주소 |
+| regionSido | string | | 시/도(주소에서 자동 추출, 완벽하지 않아도 됨) |
+| regionSigungu | string | | 시/군/구(주소에서 자동 추출, 완벽하지 않아도 됨) |
 | certifications | string[] | | 인증/자격 키 배열(내부 상담용, 보유 여부만) |
 | bizNo | string | | 사업자번호 (자동 연동 시) |
 
@@ -250,7 +254,11 @@ API에서 수집·정제된 지원 공고 1건.
 | items | string[] | ○ | 종목(1개 이상) |
 | industryKeywords | string[] | | 키워드 |
 | estDate | string | | 설립일 YYYY-MM-DD |
-| region | string | | 지역 |
+| zipcode | string | | 우편번호 |
+| address1 | string | | 기본주소 |
+| address2 | string | | 상세주소 |
+| regionSido | string | | 시/도 |
+| regionSigungu | string | | 시/군/구 |
 | certifications | string[] | | 보유 인증 배열 |
 
 **응답 (200)**
@@ -281,9 +289,17 @@ API에서 수집·정제된 지원 공고 1건.
 
 - **역할**: 기업 정보 입력 폼. **1단계**: 사업자번호 입력 + "검증" 버튼으로 사업자상태 검증 후, 회사명·매출 등 입력.
 - **Props**: `onSubmit(data: CompanyFormData)`, `loading?: boolean`
-- **CompanyFormData**: `bizNo`, `companyName`, `revenue(문자열)`, `bizTypes[]`, `items[]`, `industryKeywords[]`, `estDate`, `region`, `certifications[]`
+- **CompanyFormData**: `bizNo`, `companyName`, `revenue(문자열)`, `bizTypes[]`, `items[]`, `industryKeywords[]`, `estDate`, `zipcode`, `address1`, `address2`, `regionSido?`, `regionSigungu?`, `certifications[]`
 - **검증 흐름**: "검증" 클릭 → `POST /api/verify-biz` 호출 → 성공(active) 시 안내, 실패(휴폐업/미확인) 시 메시지 + "수동 입력으로 계속 진행할 수 있습니다." 표시. 수동 입력은 항상 가능.
 - **UI**: Tailwind로 레이블·입력·검증 버튼·결과 메시지·제출 버튼 스타일링.
+
+### 6.5 우편번호 검색(카카오/다음)
+
+- **외부 스크립트 로드 출처**: `https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js`
+- **로딩 방식**: 클라이언트 컴포넌트에서 `next/script`로 로드 후(`afterInteractive`) 로드 완료 시에만 `window.daum.Postcode`를 사용합니다.
+- **주의사항**:
+  - 네트워크/보안 정책(사내망, 광고차단, CSP 등)에 따라 외부 스크립트가 차단되면 주소 검색이 동작하지 않을 수 있습니다.
+  - 초기 구현은 **별도 API 키 없이** 동작하는 방식(우편번호 검색 위젯)만 사용합니다.
 
 ### 6.3 Dashboard — `components/Dashboard.tsx`
 

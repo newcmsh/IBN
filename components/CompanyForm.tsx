@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { CERTIFICATION_GROUPS } from "@/lib/constants/certifications";
 import { formatRevenueDisplay, parseRevenueNumber, toKoreanWon } from "@/lib/utils/koreanNumber";
+import type { PenaltyFlags } from "@/lib/types";
+import AddressSearchModal from "@/components/AddressSearchModal";
 
 export interface CompanyFormData {
   bizNo: string;
@@ -14,9 +16,15 @@ export interface CompanyFormData {
   items: string[];
   industryKeywords: string[];
   estDate: string;
-  region: string;
+  zipcode: string;
+  address1: string;
+  address2: string;
+  regionSido?: string;
+  regionSigungu?: string;
   /** 인증/자격 키 배열 (내부 상담용) */
   certifications: string[];
+  /** 감점요소 (내부 상담용) */
+  penalties: PenaltyFlags;
 }
 
 export type BizVerifyStatus = "idle" | "loading" | "success" | "fail";
@@ -29,8 +37,13 @@ const DEFAULT: CompanyFormData = {
   items: [],
   industryKeywords: [],
   estDate: "",
-  region: "",
+  zipcode: "",
+  address1: "",
+  address2: "",
+  regionSido: undefined,
+  regionSigungu: undefined,
   certifications: [],
+  penalties: {},
 };
 
 /** 한글 월 라벨 (설립일 선택용) */
@@ -48,6 +61,22 @@ const CERT_GROUP_LABEL: Record<string, string> = {
   "증빙 가능 상태(상담 참고용)": "증빙가능상태",
 };
 
+const PENALTY_HARD_ITEMS: { key: keyof PenaltyFlags; label: string }[] = [
+  { key: "taxArrears", label: "국세 체납" },
+  { key: "localTaxArrears", label: "지방세 체납" },
+  { key: "fourInsArrears", label: "4대보험 체납" },
+  { key: "inDefault", label: "금융 연체/채무불이행(현재)" },
+  { key: "inRehabBankruptcy", label: "회생/파산/청산 진행 중" },
+  { key: "businessClosed", label: "휴·폐업(사업자상태 비정상)" },
+];
+
+const PENALTY_SOFT_ITEMS: { key: keyof PenaltyFlags; label: string }[] = [
+  { key: "pastDefaultResolved", label: "과거 연체 있으나 해소" },
+  { key: "guaranteeAccidentResolved", label: "과거 보증사고 해소" },
+  { key: "guaranteeAccidentUnresolved", label: "보증사고 미해소" },
+  { key: "highDebtSuspected", label: "과다차입 의심(내부 체크)" },
+];
+
 export default function CompanyForm({
   onSubmit,
   loading,
@@ -60,6 +89,7 @@ export default function CompanyForm({
   const [verifyMessage, setVerifyMessage] = useState<string>("");
   const [itemInput, setItemInput] = useState("");
   const [keywordInput, setKeywordInput] = useState("");
+  const [addressOpen, setAddressOpen] = useState(false);
   const [openCertGroups, setOpenCertGroups] = useState<Record<string, boolean>>({
     // 기본으로 첫 그룹만 펼침
     "기업 인증": true,
@@ -107,6 +137,16 @@ export default function CompanyForm({
     setForm((p) =>
       p.bizTypes.includes(b) ? { ...p, bizTypes: p.bizTypes.filter((x) => x !== b) } : { ...p, bizTypes: [...p.bizTypes, b] }
     );
+  };
+
+  const togglePenalty = (key: keyof PenaltyFlags) => {
+    setForm((p) => ({
+      ...p,
+      penalties: {
+        ...(p.penalties ?? {}),
+        [key]: !(p.penalties as any)?.[key],
+      },
+    }));
   };
 
   // 설립일 파싱 (YYYY-MM-DD → 연/월/일)
@@ -394,18 +434,48 @@ export default function CompanyForm({
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">지역</label>
-          <input
-            type="text"
-            value={form.region}
-            onChange={(e) => setForm((p) => ({ ...p, region: e.target.value }))}
-            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm placeholder:text-slate-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
-            placeholder="서울, 경기 등"
-          />
+          <label className="block text-sm font-medium text-slate-600">주소</label>
+          <div className="mt-1 space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={form.zipcode}
+                readOnly
+                className="w-32 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                placeholder="우편번호"
+              />
+              <button
+                type="button"
+                onClick={() => setAddressOpen(true)}
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                우편번호 검색
+              </button>
+            </div>
+            <input
+              type="text"
+              value={form.address1}
+              readOnly
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+              placeholder="기본주소(도로명/지번)"
+            />
+            <input
+              type="text"
+              value={form.address2}
+              onChange={(e) => setForm((p) => ({ ...p, address2: e.target.value }))}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm placeholder:text-slate-300 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              placeholder="상세주소"
+            />
+            {(form.regionSido || form.regionSigungu) && (
+              <p className="text-xs text-slate-500">
+                지역 자동 추출: {form.regionSido ?? "-"} {form.regionSigungu ?? ""}
+              </p>
+            )}
+          </div>
         </div>
       </div>
       <div>
-        <p className="mb-2 text-sm font-medium text-slate-600">인증/자격 보유 여부 (내부 상담용)</p>
+        <p className="mb-2 text-sm font-semibold text-slate-700">가점요소 (인증/자격 보유 여부 · 내부 상담용)</p>
         <div className="rounded-xl border border-slate-200 bg-slate-50/50">
           {CERTIFICATION_GROUPS.map((grp, idx) => {
             const open = openCertGroups[grp.group] ?? false;
@@ -473,6 +543,69 @@ export default function CompanyForm({
           })}
         </div>
       </div>
+
+      <div>
+        <p className="mb-1 text-sm font-semibold text-slate-700">감점요소 (신용/여신/보증 리스크 · 내부 상담용)</p>
+        <p className="mb-3 text-xs text-slate-500">
+          감점요소는 내부 상담용 사전 판단을 위한 항목입니다. 공고마다 결격 기준은 달라질 수 있습니다.
+        </p>
+
+        <div className="space-y-3">
+          <div className="rounded-xl border border-rose-200/70 bg-rose-50/40 p-4">
+            <p className="mb-2 text-xs font-semibold text-rose-800">결격/중대(하드)</p>
+            <div className="grid grid-cols-2 gap-2">
+              {PENALTY_HARD_ITEMS.map((it) => {
+                const checked = !!form.penalties?.[it.key];
+                return (
+                  <label
+                    key={it.key}
+                    className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                      checked
+                        ? "border-rose-300 bg-rose-100/70 text-rose-900"
+                        : "border-rose-200/60 bg-white/60 text-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => togglePenalty(it.key)}
+                      className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-400"
+                    />
+                    <span className="min-w-0">{it.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-amber-200/60 bg-amber-50/30 p-4">
+            <p className="mb-2 text-xs font-semibold text-amber-900">리스크(감점)</p>
+            <div className="grid grid-cols-2 gap-2">
+              {PENALTY_SOFT_ITEMS.map((it) => {
+                const checked = !!form.penalties?.[it.key];
+                return (
+                  <label
+                    key={it.key}
+                    className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                      checked
+                        ? "border-amber-300 bg-amber-100/60 text-amber-950"
+                        : "border-amber-200/60 bg-white/60 text-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => togglePenalty(it.key)}
+                      className="h-4 w-4 rounded border-amber-300 text-amber-600 focus:ring-amber-400"
+                    />
+                    <span className="min-w-0">{it.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
       <button
         type="submit"
         disabled={loading || form.bizTypes.length === 0 || form.items.length === 0}
@@ -480,6 +613,21 @@ export default function CompanyForm({
       >
         {loading ? "매칭 중..." : "매칭 결과 보기"}
       </button>
+
+      <AddressSearchModal
+        open={addressOpen}
+        onClose={() => setAddressOpen(false)}
+        onSelect={(sel) => {
+          setForm((p) => ({
+            ...p,
+            zipcode: sel.zipcode,
+            address1: sel.address1,
+            // 상세주소는 유지
+            regionSido: sel.regionSido,
+            regionSigungu: sel.regionSigungu,
+          }));
+        }}
+      />
     </form>
   );
 }

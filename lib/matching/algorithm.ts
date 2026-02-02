@@ -4,7 +4,7 @@
  * - 지원금 3단계·금리/거치 정렬 유지. confidence(High/Medium/Low) + reasons 3줄
  */
 
-import type { CompanyProfile, GrantAnnouncement, MatchResult, TargetCriteria, AmountRange, MatchConfidence } from "@/lib/types";
+import type { CompanyProfile, GrantAnnouncement, MatchResult, TargetCriteria, AmountRange, MatchConfidence, PenaltyFlags } from "@/lib/types";
 
 const REVENUE_CAP_RATIO_CONSERVATIVE = 0.25;
 const REVENUE_CAP_RATIO_BASE = 0.35;
@@ -20,6 +20,56 @@ const SCORE_OTHER = 25;
 
 /** 인증 가점 상한 (내부 상담용) */
 const CERT_BONUS_CAP = 15;
+
+/** 감점 상한 (내부 상담용) */
+const PENALTY_CAP = 30;
+
+function calcPenalty(company: CompanyProfile): {
+  penalty: number;
+  warnings: string[];
+  hardFail: boolean;
+  hardFailReasons: string[];
+} {
+  const p = company.penalties ?? {};
+  const hardFailReasons: string[] = [];
+  const warnings: string[] = [];
+  let penalty = 0;
+
+  const hard = (flag: keyof PenaltyFlags, reason: string) => {
+    if (p[flag]) hardFailReasons.push(reason);
+  };
+  const warnPenalty = (flag: keyof PenaltyFlags, warn: string, pts: number) => {
+    if (p[flag]) {
+      warnings.push(warn);
+      penalty += pts;
+    }
+  };
+
+  // Hard Fail(즉시 탈락)
+  hard("businessClosed", "휴/폐업 상태(사업자상태 비정상)");
+  hard("inRehabBankruptcy", "회생/파산/청산 진행 중");
+  hard("inDefault", "금융 연체/채무불이행(현재)");
+
+  // 체납: 기본 구현은 Hard Fail. (추후 공고별 결격 명시 기반 토글 TODO)
+  // TODO: 공고문에 체납 결격이 명시되지 않은 경우, Hard Fail 대신 큰 감점(+경고)로 완화 옵션 적용
+  hard("taxArrears", "국세 체납");
+  hard("localTaxArrears", "지방세 체납");
+  hard("fourInsArrears", "4대보험 체납");
+
+  // Soft penalty(감점)
+  warnPenalty("guaranteeAccidentUnresolved", "보증사고 이력(미해소)로 심사 리스크", 20);
+  warnPenalty("pastDefaultResolved", "과거 연체 이력(해소) 참고 필요", 8);
+  warnPenalty("guaranteeAccidentResolved", "과거 보증사고 이력(해소) 참고 필요", 5);
+  warnPenalty("highDebtSuspected", "과다차입 의심(내부 체크) — 추가 확인 권장", 5);
+
+  penalty = Math.min(penalty, PENALTY_CAP);
+  return {
+    penalty,
+    warnings: warnings.slice(0, 3),
+    hardFail: hardFailReasons.length > 0,
+    hardFailReasons,
+  };
+}
 
 /** 인증 키별 가점: +4 / +3 / +2 / +1. E그룹(증빙 가능)은 점수 미반영, reason만 */
 function calcCertBonusAndReasons(company: CompanyProfile): { bonus: number; reasonLines: string[] } {
@@ -96,7 +146,7 @@ function keywordMatchesAny(keyword: string, textSet: Set<string>): boolean {
 }
 
 /** Hard filter + 점수(0~100) + 사유. pass=false면 rejectReasons 수집 */
-function evaluateCriteria(
+function evaluateBaseCriteria(
   company: CompanyProfile,
   criteria: TargetCriteria
 ): { pass: boolean; score: number; reasonLines: string[]; rejectReasons?: string[] } {
@@ -163,10 +213,23 @@ function evaluateCriteria(
 
   // 지역
   if (criteria.regions?.length) {
-    if (!company.region) {
+    const companySido = company.regionSido ?? company.region;
+    const companySigungu = company.regionSigungu;
+    const companyRegionText = [companySido, companySigungu].filter(Boolean).join(" ").trim();
+    const companySidoNorm = companySido ? normalizeForMatch(companySido) : "";
+    const companySigunguNorm = companySigungu ? normalizeForMatch(companySigungu) : "";
+    const companyRegionNorm = companyRegionText ? normalizeForMatch(companyRegionText) : "";
+
+    if (!companyRegionNorm) {
       rejectReasons.push("지역 조건 불충족");
     } else {
-      const regionMatch = criteria.regions.some((r) => company.region!.includes(r) || r.includes(company.region!));
+      const regionMatch = criteria.regions.some((r) => {
+        const rr = normalizeForMatch(String(r));
+        if (!rr) return false;
+        if (companySidoNorm && (companySidoNorm.includes(rr) || rr.includes(companySidoNorm))) return true;
+        if (companySigunguNorm && (companySigunguNorm.includes(rr) || rr.includes(companySigunguNorm))) return true;
+        return companyRegionNorm.includes(rr) || rr.includes(companyRegionNorm);
+      });
       if (!regionMatch) rejectReasons.push("지역 조건 불충족");
       else {
         score += Math.round(SCORE_OTHER / 3);
@@ -192,22 +255,12 @@ function evaluateCriteria(
     reasonLines.push("종목 정보 있음");
   }
 
-  // 인증 가점
-  const { bonus: certBonus, reasonLines: certReasonLines } = calcCertBonusAndReasons(company);
-  if (certBonus > 0) score = Math.min(100, score + certBonus);
-  const rest = [...reasonLines];
-  reasonLines.length = 0;
-  certReasonLines.forEach((r) => reasonLines.push(r));
-  rest.forEach((r) => {
-    if (!reasonLines.includes(r)) reasonLines.push(r);
-  });
-
   return { pass: true, score: Math.min(100, score), reasonLines };
 }
 
 function toConfidence(score: number): MatchConfidence {
   if (score >= 80) return "High";
-  if (score >= 50) return "Medium";
+  if (score >= 55) return "Medium";
   return "Low";
 }
 
@@ -245,15 +298,35 @@ export function calcAmountRange(company: CompanyProfile, announcement: GrantAnno
 
 /** 적합도 점수 0~100. evaluateCriteria.score 사용 */
 export function calcProbability(company: CompanyProfile, announcement: GrantAnnouncement): number {
-  const { pass, score } = evaluateCriteria(company, announcement.targetCriteria);
-  return pass ? score : 0;
+  const r = buildMatchResult(company, announcement);
+  return r.passed ? r.score : 0;
 }
 
 const ZERO_AMOUNT_RANGE: AmountRange = { conservative: 0, base: 0, optimistic: 0 };
 
 /** 단일 공고에 대한 매칭 결과 생성 (추천/탈락 모두 MatchResult로 반환) */
 export function buildMatchResult(company: CompanyProfile, announcement: GrantAnnouncement): MatchResult {
-  const evalResult = evaluateCriteria(company, announcement.targetCriteria);
+  const penaltyInfo = calcPenalty(company);
+
+  if (penaltyInfo.hardFail) {
+    const rejectReasons = penaltyInfo.hardFailReasons.length > 0 ? penaltyInfo.hardFailReasons : ["결격/중대 리스크"];
+    return {
+      passed: false,
+      score: 0,
+      confidence: "Low",
+      reasons: [],
+      rejectReasons: rejectReasons.slice(0, 4),
+      announcement,
+      expectedAmount: 0,
+      probability: 0,
+      amountRange: ZERO_AMOUNT_RANGE,
+      reason: rejectReasons.join(" / "),
+      scoreBreakdown: { base: 0, bonus: 0, penalty: penaltyInfo.penalty, final: 0 },
+      flags: { hardFail: true, hardFailReasons: rejectReasons, warnings: penaltyInfo.warnings ?? [] },
+    };
+  }
+
+  const evalResult = evaluateBaseCriteria(company, announcement.targetCriteria);
 
   if (!evalResult.pass) {
     const rejectReasons = evalResult.rejectReasons ?? ["조건 불충족"];
@@ -268,22 +341,36 @@ export function buildMatchResult(company: CompanyProfile, announcement: GrantAnn
       probability: 0,
       amountRange: ZERO_AMOUNT_RANGE,
       reason: rejectReasons.join(" / "),
+      scoreBreakdown: { base: 0, bonus: 0, penalty: penaltyInfo.penalty, final: 0 },
+      flags: { hardFail: false, hardFailReasons: [], warnings: penaltyInfo.warnings ?? [] },
     };
   }
 
   const amountRange = calcAmountRange(company, announcement);
-  const reasons = toReasonsThree(evalResult.reasonLines, company, announcement.targetCriteria);
+  // baseScore(0~70) + bonusScore(<=15) - penaltyScore(<=30)
+  const baseScore = Math.round(evalResult.score * 0.7);
+  const { bonus: certBonus, reasonLines: certReasonLines } = calcCertBonusAndReasons(company);
+  const finalScore = Math.max(0, Math.min(100, baseScore + certBonus - penaltyInfo.penalty));
+
+  // reasons는 상위 3개(적합한 근거). 인증 reason을 우선 포함
+  const mergedReasonLines: string[] = [];
+  for (const r of [...certReasonLines, ...evalResult.reasonLines]) {
+    if (!mergedReasonLines.includes(r)) mergedReasonLines.push(r);
+  }
+  const reasons = toReasonsThree(mergedReasonLines, company, announcement.targetCriteria);
 
   return {
     passed: true,
-    score: evalResult.score,
-    confidence: toConfidence(evalResult.score),
+    score: finalScore,
+    confidence: toConfidence(finalScore),
     reasons,
     announcement,
     expectedAmount: amountRange.base,
-    probability: evalResult.score,
+    probability: finalScore,
     amountRange,
     reason: reasons.join(" / "),
+    scoreBreakdown: { base: baseScore, bonus: certBonus, penalty: penaltyInfo.penalty, final: finalScore },
+    flags: { hardFail: false, hardFailReasons: [], warnings: penaltyInfo.warnings ?? [] },
   };
 }
 
@@ -304,7 +391,11 @@ export function runFullMatching(
     if (b.score !== a.score) return b.score - a.score;
     const ar = a.announcement.interestRate ?? INTEREST_RATE_NULL_SENTINEL;
     const br = b.announcement.interestRate ?? INTEREST_RATE_NULL_SENTINEL;
-    return ar - br;
+    if (ar !== br) return ar - br;
+    // optional: 마감 임박 우선(더 빨리 마감되는 공고 먼저)
+    const ad = a.announcement.deadlineAt ? new Date(a.announcement.deadlineAt).getTime() : Number.POSITIVE_INFINITY;
+    const bd = b.announcement.deadlineAt ? new Date(b.announcement.deadlineAt).getTime() : Number.POSITIVE_INFINITY;
+    return ad - bd;
   });
   recommended.forEach((m, i) => {
     m.rank = i + 1;

@@ -43,7 +43,7 @@ function DDayBadge({ dday }: { dday: { label: string | null; daysLeft: number | 
 }
 
 export default function MatchingCard({ match, rank }: { match: MatchResult; rank?: number }) {
-  const { passed, announcement, score, confidence, reasons, rejectReasons, amountRange } = match;
+  const { passed, announcement, score, confidence, reasons, rejectReasons, amountRange, scoreBreakdown, flags } = match;
   const { conservative, base, optimistic } = amountRange;
 
   const startAt = announcement.startAt ?? announcement.publishedAt;
@@ -142,6 +142,26 @@ export default function MatchingCard({ match, rank }: { match: MatchResult; rank
               )}
             </div>
           </div>
+
+          {scoreBreakdown && (
+            <p className="mt-2 text-xs text-slate-500">
+              점수:{" "}
+              <span className="font-semibold text-slate-700">
+                {scoreBreakdown.final}
+              </span>{" "}
+              (기본{scoreBreakdown.base} + 가점{scoreBreakdown.bonus} - 감점{scoreBreakdown.penalty})
+            </p>
+          )}
+
+          {flags?.warnings?.length ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="text-xs font-semibold text-amber-900">유의사항</p>
+              <p className="mt-1">
+                {flags.warnings.slice(0, 3).join(" · ")}
+              </p>
+            </div>
+          ) : null}
+
           {reasons.length > 0 && (
             <ul className="mt-3 list-inside list-disc space-y-0.5 text-sm text-slate-600">
               {reasons.slice(0, 3).map((line, i) => (
@@ -152,13 +172,32 @@ export default function MatchingCard({ match, rank }: { match: MatchResult; rank
         </>
       ) : (
         <>
-          {rejectReasons && rejectReasons.length > 0 && (
-            <ul className="mt-3 list-inside list-disc space-y-0.5 text-sm text-amber-800">
-              {rejectReasons.slice(0, 4).map((line, i) => (
-                <li key={i}>{line}</li>
-              ))}
-            </ul>
+          {flags?.hardFail ? (
+            <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+              <p className="text-xs font-semibold text-rose-900">결격/중대 리스크(하드)</p>
+              <ul className="mt-1 list-inside list-disc space-y-0.5">
+                {(flags.hardFailReasons?.length ? flags.hardFailReasons : ["결격/중대 리스크"]).slice(0, 4).map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            rejectReasons &&
+            rejectReasons.length > 0 && (
+              <ul className="mt-3 list-inside list-disc space-y-0.5 text-sm text-amber-800">
+                {rejectReasons.slice(0, 4).map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            )
           )}
+
+          {flags?.warnings?.length ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="text-xs font-semibold text-amber-900">유의사항</p>
+              <p className="mt-1">{flags.warnings.slice(0, 3).join(" · ")}</p>
+            </div>
+          ) : null}
         </>
       )}
     </div>

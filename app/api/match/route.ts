@@ -1,7 +1,7 @@
 /**
  * Open API: 기업 정보(회사명, 매출, 업태, 종목, 키워드)로 매칭 결과 반환
  * POST /api/match
- * Body: { companyName, revenue, bizType (string | string[]), items, industryKeywords?, estDate?, region?, certifications? }
+ * Body: { companyName, revenue, bizType (string | string[]), items, industryKeywords?, estDate?, zipcode?, address1?, address2?, regionSido?, regionSigungu?, certifications? }
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -12,7 +12,21 @@ import { getGrantAnnouncements } from "@/lib/data/grants";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { companyName, revenue, bizType, items, industryKeywords, estDate, region, certifications } = body;
+    const {
+      companyName,
+      revenue,
+      bizType,
+      items,
+      industryKeywords,
+      estDate,
+      zipcode,
+      address1,
+      address2,
+      regionSido,
+      regionSigungu,
+      certifications,
+      penalties,
+    } = body;
 
     if (!companyName || revenue == null) {
       return NextResponse.json(
@@ -40,8 +54,15 @@ export async function POST(request: NextRequest) {
       items: itemsArr,
       industryKeywords: Array.isArray(industryKeywords) ? industryKeywords.map(String).filter(Boolean) : undefined,
       estDate: estDate || undefined,
-      region: region ? String(region).trim() : undefined,
+      zipcode: zipcode ? String(zipcode).trim() : undefined,
+      address1: address1 ? String(address1).trim() : undefined,
+      address2: address2 ? String(address2).trim() : undefined,
+      regionSido: regionSido ? String(regionSido).trim() : undefined,
+      regionSigungu: regionSigungu ? String(regionSigungu).trim() : undefined,
+      // 레거시 호환: 기존 로직이 region을 참조하는 경우를 대비
+      region: regionSido ? String(regionSido).trim() : undefined,
       certifications: Array.isArray(certifications) ? certifications.map(String) : undefined,
+      penalties: penalties && typeof penalties === "object" ? (penalties as any) : undefined,
     };
 
     const announcements = await getGrantAnnouncements();
@@ -52,6 +73,8 @@ export async function POST(request: NextRequest) {
 
     const response: MatchingApiResponse = {
       companyName: company.companyName,
+      regionSido: company.regionSido,
+      regionSigungu: company.regionSigungu,
       recommended,
       rejected,
       bestMatch,

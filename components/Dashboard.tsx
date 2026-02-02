@@ -12,6 +12,7 @@ function formatAmount(n: number): string {
 }
 
 type DeadlineFilter = "all" | "7" | "30";
+type RegionFilter = "all" | "local" | "nationwide";
 
 function filterByDeadline(list: MatchResult[], filter: DeadlineFilter): MatchResult[] {
   if (filter === "all") return list;
@@ -24,18 +25,58 @@ function filterByDeadline(list: MatchResult[], filter: DeadlineFilter): MatchRes
   });
 }
 
+function normalizeForRegion(s: string): string {
+  return (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function regionCriteriaMatches(
+  criteriaRegions: unknown,
+  regionSido?: string,
+  regionSigungu?: string
+): boolean {
+  const list = Array.isArray(criteriaRegions) ? criteriaRegions.map((x) => normalizeForRegion(String(x))).filter(Boolean) : [];
+  if (list.length === 0) return false;
+  const sido = regionSido ? normalizeForRegion(regionSido) : "";
+  const sigungu = regionSigungu ? normalizeForRegion(regionSigungu) : "";
+  const combined = normalizeForRegion([regionSido, regionSigungu].filter(Boolean).join(" "));
+
+  return list.some((r) => {
+    if (!r) return false;
+    if (sido && (sido.includes(r) || r.includes(sido))) return true;
+    if (sigungu && (sigungu.includes(r) || r.includes(sigungu))) return true;
+    return combined ? combined.includes(r) || r.includes(combined) : false;
+  });
+}
+
+function filterByRegion(
+  list: MatchResult[],
+  filter: RegionFilter,
+  regionSido?: string,
+  regionSigungu?: string
+): MatchResult[] {
+  if (filter === "all") return list;
+  if (filter === "nationwide") {
+    return list.filter((m) => !m.announcement.targetCriteria?.regions || (m.announcement.targetCriteria.regions as any[])?.length === 0);
+  }
+  // local: 지역 조건이 있는 공고 중, 우리 시/도(or 시군구)와 매칭되는 것만
+  return list.filter((m) =>
+    regionCriteriaMatches(m.announcement.targetCriteria?.regions, regionSido, regionSigungu)
+  );
+}
+
 export default function Dashboard({ result }: { result: MatchingApiResponse }) {
-  const { companyName, totalExpectedAmount, matchCount, recommended, rejected, bestMatch } = result;
+  const { companyName, totalExpectedAmount, matchCount, recommended, rejected, bestMatch, regionSido, regionSigungu } = result;
   const [activeTab, setActiveTab] = useState<"recommended" | "rejected">("recommended");
   const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>("all");
+  const [regionFilter, setRegionFilter] = useState<RegionFilter>("all");
 
   const filteredRecommended = useMemo(
-    () => filterByDeadline(recommended, deadlineFilter),
-    [recommended, deadlineFilter]
+    () => filterByDeadline(filterByRegion(recommended, regionFilter, regionSido, regionSigungu), deadlineFilter),
+    [recommended, deadlineFilter, regionFilter, regionSido, regionSigungu]
   );
   const filteredRejected = useMemo(
-    () => filterByDeadline(rejected, deadlineFilter),
-    [rejected, deadlineFilter]
+    () => filterByDeadline(filterByRegion(rejected, regionFilter, regionSido, regionSigungu), deadlineFilter),
+    [rejected, deadlineFilter, regionFilter, regionSido, regionSigungu]
   );
 
   const totalRange =
@@ -101,6 +142,21 @@ export default function Dashboard({ result }: { result: MatchingApiResponse }) {
             </button>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            {regionSido && (
+              <>
+                <span className="text-xs text-slate-500">지역</span>
+                <select
+                  value={regionFilter}
+                  onChange={(e) => setRegionFilter(e.target.value as RegionFilter)}
+                  className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-700 focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                  aria-label="지역 필터"
+                >
+                  <option value="all">전체</option>
+                  <option value="local">{regionSido} 대상(지역조건 있는 공고)</option>
+                  <option value="nationwide">전국/공통(지역조건 없음)</option>
+                </select>
+              </>
+            )}
             <span className="text-xs text-slate-500">마감일</span>
             <select
               value={deadlineFilter}
