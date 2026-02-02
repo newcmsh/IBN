@@ -56,18 +56,36 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Supabase Admin(SUPABASE_SERVICE_ROLE_KEY) 미설정. DB 조회 불가." }, { status: 500 });
   }
 
-  const { data, error } = await supabaseAdmin
+  const url = new URL(request.url);
+  const statusRaw = (url.searchParams.get("status") ?? "pending").trim().toLowerCase();
+  const status =
+    statusRaw === "all" || statusRaw === "pending" || statusRaw === "approved" || statusRaw === "rejected"
+      ? statusRaw
+      : "pending";
+
+  let q = supabaseAdmin
     .from("consultant_profiles")
-    .select("user_id,email,full_name,phone,company_name,address,status,requested_at")
-    .eq("status", "pending")
-    .order("requested_at", { ascending: true })
-    .range(0, 999);
+    .select("user_id,email,full_name,phone,company_name,address,status,requested_at,approved_at,rejected_at,approved_by,note,updated_at");
+
+  if (status !== "all") {
+    q = q.eq("status", status);
+  }
+
+  const { data, error } = await q
+    .order("requested_at", { ascending: false })
+    .range(0, 1999);
 
   if (error) {
     return NextResponse.json({ error: "승인 대기 목록 조회 실패" }, { status: 500 });
   }
 
-  const res = NextResponse.json({ pending: data ?? [] });
+  const rows = data ?? [];
+  // 기존 클라이언트 호환(pending만 쓰던 시절)
+  const res = NextResponse.json({
+    status,
+    rows,
+    pending: status === "pending" ? rows : undefined,
+  });
   // 쿠키 갱신이 필요한 경우 반영
   withAuthCookies(res, admin.cookieResponse.cookies.getAll());
   return res;
