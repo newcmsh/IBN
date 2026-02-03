@@ -11,6 +11,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { parseApiResponse } from "@/lib/ingest/parseResponse";
 import { SOURCE_NAME, extractItemsFromResponse, normalizeItem, type SmesRawItem } from "@/lib/ingest/smes";
+import {
+  classifyFundTypes,
+  getTextForClassification,
+  scoreAnnouncementQuality,
+} from "@/lib/ingest/quality";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -125,7 +130,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 2) 공고 upsert (가능한 필드만)
+    // 공고 자금 유형 분류 및 품질 점수 (normalize 이후, upsert 직전)
+    const textForType = getTextForClassification({
+      title: norm.title,
+      agency: norm.agency,
+      raw: norm.raw as Record<string, unknown>,
+    });
+    const fund_types = classifyFundTypes(textForType);
+    const { score: quality_score, flags: quality_flags } = scoreAnnouncementQuality({
+      title: norm.title,
+      agency: norm.agency,
+      published_at: norm.published_at,
+      deadline_at: norm.deadline_at,
+      max_amount: norm.max_amount,
+      raw: norm.raw as Record<string, unknown>,
+    });
+
+    // 2) 공고 upsert (가능한 필드 + 품질 필드)
     const row: Record<string, unknown> = {
       source_name: SOURCE_NAME,
       source_ann_id: norm.source_ann_id,
@@ -137,6 +158,9 @@ export async function GET(request: NextRequest) {
       published_at: norm.published_at,
       deadline_at: norm.deadline_at,
       target_criteria: {},
+      fund_types,
+      quality_score,
+      quality_flags,
       updated_at: new Date().toISOString(),
     };
 

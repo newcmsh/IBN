@@ -32,6 +32,92 @@
    - `.env.example`을 복사해 `.env.local` 생성 후, 발급받은 키를 아래처럼 설정.  
    - `BIZINFO_API_KEY`, `KOSBI_API_KEY`, `NTIS_API_KEY` 등.
 
+---
+
+## 공공데이터포털(data.go.kr) API
+
+**공공데이터포털** (https://www.data.go.kr) 에서 많은 정책·공고 API를 통합 제공합니다. 회원가입 후 각 API 상세 페이지에서 **인증키(일반/Encoding)** 를 발급받아 사용합니다.
+
+### 공공데이터포털 연동 API 요약
+
+| 공공데이터포털 API (예시) | 본 프로젝트 수집 엔드포인트 | 환경 변수 (Base URL / API Key) | 코드 위치 |
+|---------------------------|-----------------------------|----------------------------------|-----------|
+| 기업마당 지원사업 목록 | `GET /api/ingest/bizinfo` | `BIZINFO_API_KEY`, `BIZINFO_API_BASE_URL`(선택) | `app/api/ingest/bizinfo/route.ts`, `lib/ingest/bizinfo.ts` |
+| 중소벤처24 민간공고목록(extPblancInfo 등) | `GET /api/ingest/smes` | `SMES_API_BASE_URL`, `SMES_EXT_PBLANC_API_KEY` | `app/api/ingest/smes/route.ts`, `lib/ingest/smes.ts` |
+| K-Startup(창업진흥원) 사업공고 등 | `GET /api/ingest/kstartup` | `KSTARTUP_API_BASE_URL`, `KSTARTUP_API_KEY` | `app/api/ingest/kstartup/route.ts` |
+
+- 공공데이터포털에서 **“기업마당”**, **“중소벤처24”**, **“창업진흥원”** 등으로 검색하면 해당 API 상세·요청 URL·파라미터 명세를 확인할 수 있습니다.
+- Base URL은 API 상세 페이지의 **“요청 URL”** 또는 **“엔드포인트”** 를 그대로 사용하고, 인증키는 **일반 인증키** 또는 **Encoding 키** 중 API 명세에 맞게 선택합니다.
+
+### 공통 요청 패턴 (data.go.kr 스타일)
+
+많은 공공데이터포털 API가 아래와 같은 쿼리 파라미터를 사용합니다.
+
+| 파라미터 | 설명 | 본 프로젝트 사용 예 |
+|----------|------|----------------------|
+| `serviceKey` | 발급받은 인증키 (필수) | Bizinfo, SMES, K-Startup 등 모든 수집 API |
+| `returnType` 또는 `type` | 응답 형식 (JSON/XML) | SMES: `returnType=JSON`, Bizinfo: `type=json` |
+| `pageNo`, `numOfRows` | 페이지네이션 (API 지원 시) | SMES: 호출자가 쿼리로 전달 가능 (`?pageNo=1&numOfRows=10`) |
+
+**SMES(중소벤처24) 예시 — `app/api/ingest/smes/route.ts`:**
+
+```ts
+const url = new URL(baseUrl);
+url.searchParams.set("serviceKey", apiKey);
+url.searchParams.set("returnType", "JSON");
+// 호출자가 pageNo, numOfRows 등 추가 쿼리 전달 가능
+request.nextUrl.searchParams.forEach((v, k) => {
+  if (k === "serviceKey" || k === "returnType") return;
+  url.searchParams.set(k, v);
+});
+```
+
+**Bizinfo(기업마당) 예시 — `app/api/ingest/bizinfo/route.ts`:**
+
+```ts
+const url = new URL(baseUrl);
+url.searchParams.set("serviceKey", apiKey);
+url.searchParams.set("type", "json");
+```
+
+### 환경 변수 (.env.local)
+
+공공데이터포털 계열 API 사용 시 서버 전용으로 설정합니다. (클라이언트 노출 금지)
+
+```bash
+# 기업마당 (공공데이터포털 또는 기업마당 직접)
+BIZINFO_API_KEY=발급받은_인증키
+# BIZINFO_API_BASE_URL=https://www.bizinfo.go.kr/api/supportList
+
+# 중소벤처24 (공공데이터포털 - 민간공고목록정보 등)
+SMES_API_BASE_URL=https://api.odcloud.kr/...   # API 상세 페이지의 요청 URL
+SMES_EXT_PBLANC_API_KEY=발급받은_인증키
+
+# K-Startup (공공데이터포털 또는 창업진흥원)
+KSTARTUP_API_BASE_URL=API_상세_요청URL
+KSTARTUP_API_KEY=발급받은_인증키
+```
+
+### 테스트 (curl)
+
+```bash
+# 기업마당 수집
+curl -s -X GET "http://localhost:3000/api/ingest/bizinfo" | jq .
+
+# 중소벤처24 수집 (페이지 파라미터 전달 가능)
+curl -s -X GET "http://localhost:3000/api/ingest/smes?pageNo=1&numOfRows=10" | jq .
+
+# K-Startup 수집
+curl -s -X GET "http://localhost:3000/api/ingest/kstartup" | jq .
+```
+
+- 실제 **요청 URL·파라미터 이름**은 공공데이터포털 각 API 상세 페이지를 반드시 확인하세요.  
+- Encoding 키 사용 시 URL 인코딩 이슈가 있으면 **일반 인증키**로 테스트해 볼 수 있습니다.
+
+**수집 코드 구조·흐름 상세**: 공공데이터포털에서 “어떤 식으로” 데이터를 수집하는지, 코드가 어떤 구조로 되어 있는지 단계별로 정리한 문서는 **`docs/DATA_PORTAL_INGEST.md`** 를 참고하세요.
+
+---
+
 ## 매칭 Open API (본 서비스)
 
 외부에서 **기업 정보만 넣고 매칭 결과**를 받으려면 아래 엔드포인트를 사용하면 됩니다.

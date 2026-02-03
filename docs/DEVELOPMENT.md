@@ -2,6 +2,8 @@
 
 다른 개발자가 현재까지 진행된 코드를 이해하고 이어서 개발할 수 있도록 정리한 문서입니다.
 
+> **전체 작업 개요(누구나 쉽게)**: `docs/PROJECT_OVERVIEW.md` — 어떤 코드를 썼고 어떻게 작업했는지 한눈에 보는 문서.  
+> **적합도·예상지원금 구조**: `docs/MATCHING_SCORE_AND_AMOUNT.md` — 점수 구성, 추천 로직, 지원금 3단계 산식, 매출과 지원금 관계.  
 > **최신 인수인계 문서(권장)**: `docs/HANDOFF.md`  
 > 이 문서는 초기 작성분이 포함되어 있어, 세부가 바뀐 항목(입력 모델/응답 구조/정렬 규칙 등)은 반드시 `docs/HANDOFF.md`와 실제 코드(`lib/types.ts`, `lib/matching/algorithm.ts`, `app/api/*`)를 우선 기준으로 확인하세요.
 

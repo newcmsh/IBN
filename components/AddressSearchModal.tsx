@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Script from "next/script";
 
 declare global {
@@ -65,29 +66,42 @@ export default function AddressSearchModal({
     if (!containerRef.current) return;
     if (!window.daum?.Postcode) return;
 
-    // 컨테이너 초기화
-    containerRef.current.innerHTML = "";
+    // 처음 열릴 때 레이아웃이 끝난 뒤 임베드하도록 한 프레임 대기 (잘림 방지)
+    const frameId = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!containerRef.current) return;
+        const el = containerRef.current;
+        el.innerHTML = "";
 
-    const postcode = new window.daum.Postcode({
-      oncomplete: (data: any) => {
-        const zipcode = String(data?.zonecode ?? "").trim();
-        const userSelectedType = String(data?.userSelectedType ?? "").toUpperCase(); // R | J
-        const addressType: AddressTypeLabel = userSelectedType === "R" ? "도로명" : "지번";
-        const address1Raw =
-          userSelectedType === "R"
-            ? String(data?.roadAddress ?? "")
-            : String(data?.jibunAddress ?? "");
-        const address1 = (address1Raw || String(data?.address ?? "") || "").trim();
+        const postcode = new window.daum.Postcode({
+          oncomplete: (data: any) => {
+            const zipcode = String(data?.zonecode ?? "").trim();
+            const userSelectedType = String(data?.userSelectedType ?? "").toUpperCase(); // R | J
+            const addressType: AddressTypeLabel = userSelectedType === "R" ? "도로명" : "지번";
+            const address1Raw =
+              userSelectedType === "R"
+                ? String(data?.roadAddress ?? "")
+                : String(data?.jibunAddress ?? "");
+            const address1 = (address1Raw || String(data?.address ?? "") || "").trim();
 
-        const { regionSido, regionSigungu } = parseRegionFromAddress1(address1);
-        onSelect({ zipcode, address1, addressType, regionSido, regionSigungu });
-        onClose();
-      },
-      width: "100%",
-      height: "100%",
+            const { regionSido, regionSigungu } = parseRegionFromAddress1(address1);
+            onSelect({ zipcode, address1, addressType, regionSido, regionSigungu });
+            onClose();
+          },
+          width: "100%",
+          height: "100%",
+        });
+
+        postcode.embed(el);
+
+        // Daum iframe이 컨테이너 크기를 올바르게 쓰도록 resize 한 번 발생
+        setTimeout(() => {
+          window.dispatchEvent(new Event("resize"));
+        }, 50);
+      });
     });
 
-    postcode.embed(containerRef.current);
+    return () => cancelAnimationFrame(frameId);
   }, [open, scriptReady, onClose, onSelect]);
 
   if (!open) {
@@ -101,7 +115,7 @@ export default function AddressSearchModal({
     );
   }
 
-  return (
+  const modalContent = (
     <>
       <Script
         src={scriptSrc}
@@ -109,15 +123,24 @@ export default function AddressSearchModal({
         onLoad={() => setScriptReady(true)}
       />
 
-      <div className="fixed inset-0 z-[60]">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-auto p-4">
         <button
           type="button"
           className="absolute inset-0 bg-black/50"
           onClick={onClose}
           aria-label="주소 검색 닫기"
         />
-        <div className="absolute left-1/2 top-1/2 w-[min(520px,92vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        {/* Daum 우편번호 UI 최소 500px 필요; 좁은 화면에서는 스크롤로 전체 노출 */}
+        <div
+          className="relative z-10 flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          style={{
+            width: "min(600px, 95vw)",
+            minWidth: "500px",
+            height: "min(90vh, 600px)",
+            maxHeight: "600px",
+          }}
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
             <div>
               <p className="text-sm font-semibold text-slate-900">우편번호 검색</p>
               <p className="mt-0.5 text-xs text-slate-500">주소를 선택하면 자동으로 입력됩니다.</p>
@@ -125,26 +148,33 @@ export default function AddressSearchModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
             >
               닫기
             </button>
           </div>
 
-          <div className="h-[520px]">
+          <div className="min-h-0 flex-1">
             {!scriptReady && (
-              <div className="flex h-full items-center justify-center text-sm text-slate-500">
+              <div className="flex h-full min-h-[400px] items-center justify-center text-sm text-slate-500">
                 주소 검색 모듈을 불러오는 중...
               </div>
             )}
             <div
               ref={containerRef}
               className={`h-full w-full ${scriptReady ? "" : "hidden"}`}
+              style={{ minHeight: "450px" }}
             />
           </div>
         </div>
       </div>
     </>
   );
+
+  // 폼/사이드바 overflow에 잘리지 않도록 body에 직접 렌더
+  if (typeof document !== "undefined") {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 }
 

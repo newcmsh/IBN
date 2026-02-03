@@ -38,9 +38,11 @@ npm run dev
 
 ## 문서
 
+- **전체 작업 개요(누구나 쉽게)**: [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — 어떤 코드를 썼고 어떻게 작업했는지 한눈에 보는 문서
 - **총 작업 내역**: [docs/PROJECT_WORK_SUMMARY.md](docs/PROJECT_WORK_SUMMARY.md) — 지금까지 요청·반영된 개발 작업 전부 정리
 - **개발 문서 (신규 개발자용)**: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — 현재까지 구현된 코드, 타입, API, UI, DB 스키마, 확장 가이드
 - **공공 API 연동**: [docs/API_INTEGRATION.md](docs/API_INTEGRATION.md)
+- **Electron exe 빌드**: [docs/ELECTRON_BUILD.md](docs/ELECTRON_BUILD.md)
 
 ## 프로젝트 구조
 

@@ -23,6 +23,11 @@ import {
   normalizeItem,
   type BizinfoRawItem,
 } from "@/lib/ingest/bizinfo";
+import {
+  classifyFundTypes,
+  getTextForClassification,
+  scoreAnnouncementQuality,
+} from "@/lib/ingest/quality";
 
 /** 실제 URL은 기업마당 정책정보 개방 또는 공공데이터포털 API 명세 확인 후 BIZINFO_API_BASE_URL로 설정 */
 const DEFAULT_BIZINFO_BASE_URL = "https://www.bizinfo.go.kr/api/supportList";
@@ -133,7 +138,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // grant_announcements: 1차 매핑 upsert (title, agency, url, published_at, deadline_at, max_amount)
+    // 공고 자금 유형 분류 및 품질 점수 (normalize 이후, upsert 직전)
+    const textForType = getTextForClassification({
+      title: norm.title,
+      agency: norm.agency,
+      raw: norm.raw as Record<string, unknown>,
+    });
+    const fund_types = classifyFundTypes(textForType);
+    const { score: quality_score, flags: quality_flags } = scoreAnnouncementQuality({
+      title: norm.title,
+      agency: norm.agency,
+      published_at: norm.published_at,
+      deadline_at: norm.deadline_at,
+      max_amount: norm.max_amount,
+      raw: norm.raw as Record<string, unknown>,
+    });
+
+    // grant_announcements: 1차 매핑 + 품질 필드 upsert
     const row: Record<string, unknown> = {
       source_name: SOURCE_NAME,
       source_ann_id: norm.source_ann_id,
@@ -145,6 +166,9 @@ export async function GET(request: NextRequest) {
       published_at: norm.published_at,
       deadline_at: norm.deadline_at,
       target_criteria: {},
+      fund_types,
+      quality_score,
+      quality_flags,
       updated_at: new Date().toISOString(),
     };
 

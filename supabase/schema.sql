@@ -107,6 +107,14 @@ CREATE TABLE IF NOT EXISTS grant_announcements (
 -- 기존 테이블에 컬럼이 없을 수 있으므로 idempotent migration
 ALTER TABLE grant_announcements ADD COLUMN IF NOT EXISTS source_url TEXT;
 
+-- 공고 품질·자금유형 (수집 품질 개선: 삭제 없이 분리용)
+ALTER TABLE grant_announcements ADD COLUMN IF NOT EXISTS fund_types TEXT[] DEFAULT '{}';
+ALTER TABLE grant_announcements ADD COLUMN IF NOT EXISTS quality_score INT;
+ALTER TABLE grant_announcements ADD COLUMN IF NOT EXISTS quality_flags TEXT[] DEFAULT '{}';
+COMMENT ON COLUMN grant_announcements.fund_types IS '자금 유형 분류: LOAN, GUARANTEE, SUBSIDY, RND (복수 가능)';
+COMMENT ON COLUMN grant_announcements.quality_score IS '품질 점수 0~100. >=70 정상, 40~69 정보부족, <40 검수대상';
+COMMENT ON COLUMN grant_announcements.quality_flags IS '품질 플래그: missing_title, looks_like_event 등';
+
 -- =============================================================================
 -- 4. RLS 정책 대상 테이블 (user_id 소유 행)
 -- =============================================================================
