@@ -65,7 +65,7 @@ function filterByRegion(
 }
 
 export default function Dashboard({ result }: { result: MatchingApiResponse }) {
-  const { companyName, totalExpectedAmount, matchCount, recommended, rejected, bestMatch, regionSido, regionSigungu } = result;
+  const { companyName, totalExpectedAmount, matchCount, recommended, rejected, bestMatch, regionSido, regionSigungu, _meta } = result;
   const [activeTab, setActiveTab] = useState<"recommended" | "rejected">("recommended");
   const [deadlineFilter, setDeadlineFilter] = useState<DeadlineFilter>("all");
   const [regionFilter, setRegionFilter] = useState<RegionFilter>("all");
@@ -106,6 +106,24 @@ export default function Dashboard({ result }: { result: MatchingApiResponse }) {
         <p className="mt-1 text-sm opacity-80">
           추천 공고 {matchCount}건 · 탈락 공고 {rejected.length}건
         </p>
+        {_meta?.announcementsSource === "sample" && (
+          <p className="mt-2 rounded-lg bg-white/20 px-3 py-2 text-xs">
+            ⚠️ 현재 <strong>데모용 샘플 공고 {_meta.announcementsCount}건</strong>으로 매칭 중입니다. 실제 수집 데이터를 쓰려면 Supabase를 연결하고 수집 API를 실행하세요.{" "}
+            <a
+              href="/api/grants/status"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline opacity-90 hover:opacity-100"
+            >
+              원인 확인 (상태 API)
+            </a>
+          </p>
+        )}
+        {_meta?.announcementsSource === "db" && _meta.announcementsCount === 0 && (
+          <p className="mt-2 rounded-lg bg-white/20 px-3 py-2 text-xs">
+            수집된 공고가 없습니다. <code className="rounded bg-white/20 px-1">/api/ingest/bizinfo</code> 또는 <code className="rounded bg-white/20 px-1">/api/ingest/smes</code>를 실행해 공고를 수집한 뒤 다시 매칭해 보세요.
+          </p>
+        )}
       </div>
 
       {bestMatch && (

@@ -14,7 +14,8 @@
     "electron:dev": "npm run electron:compile && concurrently \"npm run dev:3000\" \"wait-on http://localhost:3000 && electron .\"",
     "electron:build": "npm run electron:write-url && npm run electron:compile && electron-builder",
     "deploy": "vercel --prod",
-    "deploy:exe": "node scripts/deploy-and-build-exe.js"
+    "deploy:exe": "node scripts/deploy-and-build-exe.js",
+    "check:domain": "node scripts/check-domain.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

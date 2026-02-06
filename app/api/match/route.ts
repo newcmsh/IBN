@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { CompanyProfile, MatchingApiResponse } from "@/lib/types";
 import { runFullMatching } from "@/lib/matching/algorithm";
-import { getGrantAnnouncements } from "@/lib/data/grants";
+import { getGrantAnnouncementsWithSource } from "@/lib/data/grants";
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       penalties: penalties && typeof penalties === "object" ? (penalties as any) : undefined,
     };
 
-    const announcements = await getGrantAnnouncements();
+    const { announcements, source } = await getGrantAnnouncementsWithSource();
     const { recommended, rejected } = runFullMatching(company, announcements);
 
     const totalExpectedAmount = recommended.reduce((sum, m) => sum + m.expectedAmount, 0);
@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
       bestMatch,
       totalExpectedAmount,
       matchCount: recommended.length,
+      _meta: { announcementsSource: source, announcementsCount: announcements.length },
     };
 
     return NextResponse.json(response);

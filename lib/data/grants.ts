@@ -101,8 +101,11 @@ const SAMPLE_ANNOUNCEMENTS: GrantAnnouncement[] = [
   },
 ];
 
-/** 공고 목록 반환. 추후 Supabase 또는 외부 API 호출로 대체 */
-export async function getGrantAnnouncements(): Promise<GrantAnnouncement[]> {
+/** 공고 목록 + 소스(db | sample). 매칭이 실제 수집 데이터를 쓰는지 확인용 */
+export async function getGrantAnnouncementsWithSource(): Promise<{
+  announcements: GrantAnnouncement[];
+  source: "db" | "sample";
+}> {
   // Supabase grant_announcements(수집된 실제 데이터)가 있으면 우선 사용
   if (supabaseAdmin) {
     try {
@@ -111,12 +114,15 @@ export async function getGrantAnnouncements(): Promise<GrantAnnouncement[]> {
         .select(
           "source_name,source_ann_id,agency,title,max_amount,url,source_url,published_at,deadline_at,interest_rate,grace_period_months,target_criteria"
         )
-        // 기본 정렬: 최신 게시일 우선 (없으면 created_at 기준이지만 여기선 생략)
         .order("published_at", { ascending: false, nullsFirst: false })
         .range(0, 999);
 
+      if (error) {
+        console.warn("getGrantAnnouncements: Supabase error", error.message, error.code);
+      }
+
       if (!error && Array.isArray(data) && data.length > 0) {
-        return data.map((row) => {
+        const announcements = data.map((row) => {
           const sourceName = String((row as any).source_name || "bizinfo");
           const source = sourceName as DataSource;
           const sourceAnnId = String((row as any).source_ann_id || "");
@@ -144,16 +150,24 @@ export async function getGrantAnnouncements(): Promise<GrantAnnouncement[]> {
             deadlineAt,
           } satisfies GrantAnnouncement;
         });
+        return { announcements, source: "db" };
       }
-      // Supabase가 연결되어 있는데 공고가 0건이면 샘플을 섞지 않고 빈 배열 반환(혼동 방지)
-      if (!error && Array.isArray(data) && data.length === 0) return [];
-    } catch {
-      // 실패 시 샘플로 fallback
+      // Supabase 연결됐는데 공고 0건 → 빈 배열, 소스는 db(수집 후 채우면 됨)
+      if (!error && Array.isArray(data) && data.length === 0) {
+        return { announcements: [], source: "db" };
+      }
+    } catch (e) {
+      console.warn("getGrantAnnouncements: Supabase 조회 실패, 샘플 사용.", e);
     }
   }
 
-  // fallback: 샘플 (데모용)
-  return SAMPLE_ANNOUNCEMENTS;
+  return { announcements: SAMPLE_ANNOUNCEMENTS, source: "sample" };
+}
+
+/** 공고 목록 반환 (호환용). 실제로는 getGrantAnnouncementsWithSource 사용 권장 */
+export async function getGrantAnnouncements(): Promise<GrantAnnouncement[]> {
+  const { announcements } = await getGrantAnnouncementsWithSource();
+  return announcements;
 }
 
 export { SAMPLE_ANNOUNCEMENTS };

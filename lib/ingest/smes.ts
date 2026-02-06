@@ -159,6 +159,10 @@ export function normalizeItem(item: SmesRawItem, index: number): NormalizedSmesA
     safeNum(item.supportAmount) ??
     safeNum(item.maxSptAmt) ??
     safeNum(item.limitAmt) ??
+    safeNum(item.sptLmtAmt) ??
+    safeNum(item.sptLmt) ??
+    safeNum(item.supportLimit) ??
+    safeNum(item.limitAmount) ??
     null;
 
   return {

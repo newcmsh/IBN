@@ -93,7 +93,16 @@ export function normalizeItem(item: BizinfoRawItem, index: number): NormalizedAn
   const url = safeStr(item.url) || safeStr(item.link) || safeStr(item.detailUrl) || null;
   const published_at = safeDate(item.publishedAt) ?? safeDate(item.regDt) ?? safeDate(item.rgstDt) ?? safeDate(item.pubDate) ?? null;
   const deadline_at = safeDate(item.deadlineAt) ?? safeDate(item.endDt) ?? safeDate(item.dlDt) ?? safeDate(item.deadline) ?? null;
-  const max_amount = safeNum(item.maxAmount) ?? safeNum(item.max_amount) ?? safeNum(item.limitAmt) ?? safeNum(item.sptLmtAmt) ?? null;
+  const max_amount =
+    safeNum(item.maxAmount) ??
+    safeNum(item.max_amount) ??
+    safeNum(item.limitAmt) ??
+    safeNum(item.sptLmtAmt) ??
+    safeNum(item.sptLmt) ??
+    safeNum(item.supportLimit) ??
+    safeNum(item.supportAmt) ??
+    safeNum(item.limitAmount) ??
+    null;
 
   return {
     source_ann_id,

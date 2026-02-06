@@ -147,18 +147,13 @@ export interface MatchResult {
 /** Open API 응답 - 추천/탈락 전부 포함 */
 export interface MatchingApiResponse {
   companyName: string;
-  /** 요청 기업의 시/도(주소 기반) */
   regionSido?: string;
-  /** 요청 기업의 시/군/구(주소 기반) */
   regionSigungu?: string;
-  /** 추천 공고 (passed=true) */
   recommended: MatchResult[];
-  /** 탈락 공고 (passed=false) */
   rejected: MatchResult[];
-  /** 가장 유리한 창구 = recommended[0] */
   bestMatch: MatchResult | null;
-  /** recommended의 expectedAmount 합 */
   totalExpectedAmount: number;
-  /** recommended.length */
   matchCount: number;
+  /** 매칭에 사용된 공고 소스. sample=데모 5건, db=실제 수집 데이터 */
+  _meta?: { announcementsSource: "db" | "sample"; announcementsCount: number };
 }
